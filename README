@@ -1,0 +1,36 @@
+twty: command-line twitter client
+
+Install:
+
+  1. install golang environment.
+
+    see: http://golang.org/doc/install.html
+    for japanese: http://golang.jp/install
+	for windows user: http://code.google.com/p/gomingw/downloads/list
+
+  2. get source
+
+    git clone https://github.com/mattn/twty.git
+
+  3. build
+
+    # make
+
+Usage:
+
+    # ./twty -h
+
+	At the first, you can see the opening web-browser.  And you'll see
+	pin-code is shown on twitter.com.  Please copy it and type in console
+	like following.
+
+	  PIN: XXXXXX
+
+    Configuration file is stored in ~/.config/twty/settings.json
+	for windows user: %USERPROFILE%/Application Data/twty/settings.json
+
+Author:
+
+    Yasuhiro Matsumoto <mattn.jp@gmail.com>
+
+Have Fan!
