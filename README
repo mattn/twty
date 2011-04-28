@@ -41,6 +41,12 @@ Usage:
     Configuration file is stored in ~/.config/twty/settings.json
     for windows user: %USERPROFILE%/Application Data/twty/settings.json
 
+FAQ:
+
+    Do you use proxy? then set environment variable HTTP_PROXY like below.
+
+        HTTP_PROXY=http://myproxy.example.com:8080
+
 Author:
 
     Yasuhiro Matsumoto <mattn.jp@gmail.com>
