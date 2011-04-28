@@ -8,6 +8,18 @@ Install:
     for japanese: http://golang.jp/install
     for windows user: http://code.google.com/p/gomingw/downloads/list
 
+    And install twister.
+
+    # goinstall github.com/garyburd/twister/oauth
+
+    And install go-iconv.
+
+    # git clone https://github.com/oibore/go-iconv.git
+    # cd go-iconv/src
+    # make install
+
+    That's all!
+
   2. get source
 
     git clone https://github.com/mattn/twty.git
