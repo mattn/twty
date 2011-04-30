@@ -14,8 +14,8 @@ Install:
 
     And install go-iconv.
 
-    # git clone https://github.com/oibore/go-iconv.git
-    # cd go-iconv/src
+    # git clone https://github.com/sloonz/go-iconv.git
+    # cd go-iconv
     # make install
 
     That's all!

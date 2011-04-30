@@ -101,7 +101,12 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, os.Error) 
 		log.Fatal("canceled")
 	}
 
-	accessToken, _, err := oauthClient.RequestToken(requestToken, string(b[0:len(b)-2]))
+	if b[len(b)-2] == '\r' {
+		b = b[0:len(b)-2]
+	} else {
+		b = b[0:len(b)-1]
+	}
+	accessToken, _, err := oauthClient.RequestToken(requestToken, string(b))
 	if err != nil {
 		log.Fatal("failed to request token:", err)
 	}
@@ -160,36 +165,36 @@ func getTweets(token *oauth.Credentials, url string, opt map[string]string) ([]T
 	return tweets, nil
 }
 
-func showRSS(rss RSS) {
+func convert_utf8(s string) string {
 	ic, err := iconv.Open("char", "UTF-8")
 	if err != nil {
-		log.Fatal("failed to convert string:", err)
+		return s
 	}
 	defer ic.Close()
+	ret, _ := ic.Conv(s)
+	return ret
+}
+
+func showRSS(rss RSS) {
 	items := rss.Channel.Item
 	for i := len(items) - 1; i >= 0; i-- {
 		user := strings.Split(items[i].Author, "@", 2)[0]
-		user, _ = ic.Conv(user)
-		text, _ := ic.Conv(items[i].Title)
+		user = convert_utf8(user)
+		text := convert_utf8(items[i].Title)
 		println(user + ": " + text)
 	}
 }
 
 func showTweets(tweets []Tweet, verbose bool) {
-	ic, err := iconv.Open("char", "UTF-8")
-	if err != nil {
-		log.Fatal("failed to convert string:", err)
-	}
-	defer ic.Close()
 	if verbose {
 		for i := len(tweets) - 1; i >= 0; i-- {
-			name, _ := ic.Conv(tweets[i].User.Name)
-			user, _ := ic.Conv(tweets[i].User.ScreenName)
+			name := convert_utf8(tweets[i].User.Name)
+			user := convert_utf8(tweets[i].User.ScreenName)
 			text := tweets[i].Text
 			text = strings.Replace(text, "\r", "", -1)
 			text = strings.Replace(text, "\n", " ", -1)
 			text = strings.Replace(text, "\t", " ", -1)
-			text, _ = ic.Conv(text)
+			text = convert_utf8(text)
 			println(user + ": " + name)
 			println("  " + text)
 			println("  " + tweets[i].Identifier)
@@ -198,8 +203,8 @@ func showTweets(tweets []Tweet, verbose bool) {
 		}
 	} else {
 		for i := len(tweets) - 1; i >= 0; i-- {
-			user, _ := ic.Conv(tweets[i].User.ScreenName)
-			text, _ := ic.Conv(tweets[i].Text)
+			user := convert_utf8(tweets[i].User.ScreenName)
+			text := convert_utf8(tweets[i].Text)
 			println(user + ": " + text)
 		}
 	}
