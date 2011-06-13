@@ -272,7 +272,6 @@ func main() {
 	list := flag.String("l", "", "show tweets")
 	user := flag.String("u", "", "show user timeline")
 	favorite := flag.String("f", "", "specify favorite ID")
-	favstar := flag.String("F", "", "show favstar")
 	search := flag.String("s", "", "search word")
 	inreply := flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	verbose := flag.Bool("v", false, "detail display")
@@ -316,98 +315,6 @@ func main() {
 			log.Fatal("could not unmarhal response:", err)
 		}
 		showRSS(rss)
-	} else if len(*favstar) > 0 {
-		res, err := http.Get("http://favstar.fm/users/" + *favstar + "/recent")
-		if err != nil {
-			log.Fatal("failed to display favstar:", err)
-		}
-		defer res.Body.Close()
-		b, _ := ioutil.ReadAll(res.Body)
-		//b, _ = ioutil.ReadFile("a.xml")
-		s := string(b)
-		s = regexp.MustCompile(`<script.*/script>`).ReplaceAllString(s, "")
-//		s = regexp.MustCompile(`<(area|base|basefont|br|nobr|col|frame|hr|img|input|isindex|link|meta|param|embed|keygen|command)[^>]*[^/]>`).ReplaceAllStringFunc(s, func(r string) string {
-//			return r[0:len(r)-1] + "/>"
-//		})
-
-		doc, err := html.Parse(strings.NewReader(s))
-		if err != nil {
-			log.Fatal("failed to parse html:", err)
-		}
-		var walk func(*html.Node, string, map[string]string) []*html.Node
-		walk = func(n *html.Node, tag string, attr map[string]string) (l []*html.Node) {
-			switch n.Type {
-			case html.ErrorNode:
-				return
-			case html.DocumentNode:
-				if len(n.Child) > 0 {
-					l = walk(n.Child[0], tag, attr)
-				}
-				return
-			case html.CommentNode:
-				return
-			case html.TextNode:
-				if tag == "TEXT" {
-					//l = append(l, n)
-				} else {
-					return
-				}
-			default:
-				return
-			case html.ElementNode:
-				if strings.ToLower(tag) == strings.ToLower(n.Data) {
-					if len(attr) > 0 {
-						for _, a := range n.Attr {
-							val, found := attr[a.Key]
-							if found {
-								for _, as := range strings.Split(a.Val, " ", -1) {
-									if as == val {
-										for _, e := range l {
-											if e == n {
-												return
-											}
-										}
-										l = append(l, n)
-										break
-									}
-								}
-								break
-							}
-						}
-					} else {
-						//l = append(l, n)
-					}
-				}
-				for _, c := range n.Child {
-					for _, f := range walk(c, tag, attr) {
-						for _, e := range l {
-							if e == f {
-								return
-							}
-						}
-						l = append(l, f)
-					}
-				}
-			}
-
-			return
-		}
-		tweetWithStats := walk(doc, "div", map[string]string{"class": "tweetWithStats"})
-		fmt.Println(len(tweetWithStats))
-		for _, tweetWithStat := range tweetWithStats {
-			theTweet := walk(tweetWithStat, "div", map[string]string{"class": "theTweet"})
-			fmt.Println("-----------")
-			fmt.Println(len(theTweet))
-			t := ""
-			if len(theTweet) > 0 {
-				for _, text := range walk(theTweet[0], "TEXT", map[string]string{}) {
-					t += strings.TrimSpace(text.Data)
-				}
-				if t != "" {
-					fmt.Println(t)
-				}
-			}
-		}
 	} else if *reply {
 		tweets, err := getTweets(token, "https://api.twitter.com/1/statuses/mentions.json", map[string]string{})
 		if err != nil {
