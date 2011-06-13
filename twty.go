@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"github.com/garyburd/twister/oauth"
 	"github.com/garyburd/twister/web"
+	iconv "github.com/sloonz/go-iconv/src"
+	"html"
 	"http"
-	"iconv"
 	"io/ioutil"
 	"json"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"xml"
@@ -52,16 +54,16 @@ type Tweet struct {
 
 type RSS struct {
 	Channel struct {
-		Title string
+		Title       string
 		Description string
-		Link string
-		Item []struct {
-			Title string
+		Link        string
+		Item        []struct {
+			Title       string
 			Description string
-			PubDate string
-			Link []string
-			Guid string
-			Author string
+			PubDate     string
+			Link        []string
+			Guid        string
+			Author      string
 		}
 	}
 }
@@ -102,11 +104,11 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, os.Error) 
 	}
 
 	if b[len(b)-2] == '\r' {
-		b = b[0:len(b)-2]
+		b = b[0 : len(b)-2]
 	} else {
-		b = b[0:len(b)-1]
+		b = b[0 : len(b)-1]
 	}
-	accessToken, _, err := oauthClient.RequestToken(requestToken, string(b))
+	accessToken, _, err := oauthClient.RequestToken(http.DefaultClient, requestToken, string(b))
 	if err != nil {
 		log.Fatal("failed to request token:", err)
 	}
@@ -124,7 +126,7 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, os.Erro
 	if foundToken && foundSecret {
 		token = &oauth.Credentials{accessToken, accessSecert}
 	} else {
-		requestToken, err := oauthClient.RequestTemporaryCredentials("")
+		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "")
 		if err != nil {
 			log.Print("failed to request temporary credentials:", err)
 			return nil, false, err
@@ -143,13 +145,13 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, os.Erro
 }
 
 func getTweets(token *oauth.Credentials, url string, opt map[string]string) ([]Tweet, os.Error) {
-	param := make(web.ParamMap)
+	param := make(web.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
 	oauthClient.SignParam(token, "GET", url, param)
 	url = url + "?" + param.FormEncodedString()
-	res, _, err := http.Get(url)
+	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +183,7 @@ func showRSS(rss RSS) {
 		user := strings.Split(items[i].Author, "@", 2)[0]
 		user = convert_utf8(user)
 		text := convert_utf8(items[i].Title)
-		println(user + ": " + text)
+		fmt.Println(user + ": " + text)
 	}
 }
 
@@ -195,28 +197,28 @@ func showTweets(tweets []Tweet, verbose bool) {
 			text = strings.Replace(text, "\n", " ", -1)
 			text = strings.Replace(text, "\t", " ", -1)
 			text = convert_utf8(text)
-			println(user + ": " + name)
-			println("  " + text)
-			println("  " + tweets[i].Identifier)
-			println("  " + tweets[i].CreatedAt)
-			println()
+			fmt.Println(user + ": " + name)
+			fmt.Println("  " + text)
+			fmt.Println("  " + tweets[i].Identifier)
+			fmt.Println("  " + tweets[i].CreatedAt)
+			fmt.Println()
 		}
 	} else {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			user := convert_utf8(tweets[i].User.ScreenName)
 			text := convert_utf8(tweets[i].Text)
-			println(user + ": " + text)
+			fmt.Println(user + ": " + text)
 		}
 	}
 }
 
 func postTweet(token *oauth.Credentials, url string, opt map[string]string) os.Error {
-	param := make(web.ParamMap)
+	param := make(web.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
 	oauthClient.SignParam(token, "POST", url, param)
-	res, err := http.PostForm(url, param.StringMap())
+	res, err := http.PostForm(url, http.Values(param))
 	if err != nil {
 		log.Println("failed to post tweet:", err)
 		return err
@@ -270,6 +272,7 @@ func main() {
 	list := flag.String("l", "", "show tweets")
 	user := flag.String("u", "", "show user timeline")
 	favorite := flag.String("f", "", "specify favorite ID")
+	favstar := flag.String("F", "", "show favstar")
 	search := flag.String("s", "", "search word")
 	inreply := flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	verbose := flag.Bool("v", false, "detail display")
@@ -302,7 +305,7 @@ func main() {
 	}
 
 	if len(*search) > 0 {
-		res, _, err := http.Get("http://search.twitter.com/search.rss?q=" + http.URLEscape(*search))
+		res, err := http.Get("http://search.twitter.com/search.rss?q=" + http.URLEscape(*search))
 		if err != nil {
 			log.Fatal("failed to search word:", err)
 		}
@@ -313,6 +316,98 @@ func main() {
 			log.Fatal("could not unmarhal response:", err)
 		}
 		showRSS(rss)
+	} else if len(*favstar) > 0 {
+		res, err := http.Get("http://favstar.fm/users/" + *favstar + "/recent")
+		if err != nil {
+			log.Fatal("failed to display favstar:", err)
+		}
+		defer res.Body.Close()
+		b, _ := ioutil.ReadAll(res.Body)
+		//b, _ = ioutil.ReadFile("a.xml")
+		s := string(b)
+		s = regexp.MustCompile(`<script.*/script>`).ReplaceAllString(s, "")
+//		s = regexp.MustCompile(`<(area|base|basefont|br|nobr|col|frame|hr|img|input|isindex|link|meta|param|embed|keygen|command)[^>]*[^/]>`).ReplaceAllStringFunc(s, func(r string) string {
+//			return r[0:len(r)-1] + "/>"
+//		})
+
+		doc, err := html.Parse(strings.NewReader(s))
+		if err != nil {
+			log.Fatal("failed to parse html:", err)
+		}
+		var walk func(*html.Node, string, map[string]string) []*html.Node
+		walk = func(n *html.Node, tag string, attr map[string]string) (l []*html.Node) {
+			switch n.Type {
+			case html.ErrorNode:
+				return
+			case html.DocumentNode:
+				if len(n.Child) > 0 {
+					l = walk(n.Child[0], tag, attr)
+				}
+				return
+			case html.CommentNode:
+				return
+			case html.TextNode:
+				if tag == "TEXT" {
+					//l = append(l, n)
+				} else {
+					return
+				}
+			default:
+				return
+			case html.ElementNode:
+				if strings.ToLower(tag) == strings.ToLower(n.Data) {
+					if len(attr) > 0 {
+						for _, a := range n.Attr {
+							val, found := attr[a.Key]
+							if found {
+								for _, as := range strings.Split(a.Val, " ", -1) {
+									if as == val {
+										for _, e := range l {
+											if e == n {
+												return
+											}
+										}
+										l = append(l, n)
+										break
+									}
+								}
+								break
+							}
+						}
+					} else {
+						//l = append(l, n)
+					}
+				}
+				for _, c := range n.Child {
+					for _, f := range walk(c, tag, attr) {
+						for _, e := range l {
+							if e == f {
+								return
+							}
+						}
+						l = append(l, f)
+					}
+				}
+			}
+
+			return
+		}
+		tweetWithStats := walk(doc, "div", map[string]string{"class": "tweetWithStats"})
+		fmt.Println(len(tweetWithStats))
+		for _, tweetWithStat := range tweetWithStats {
+			theTweet := walk(tweetWithStat, "div", map[string]string{"class": "theTweet"})
+			fmt.Println("-----------")
+			fmt.Println(len(theTweet))
+			t := ""
+			if len(theTweet) > 0 {
+				for _, text := range walk(theTweet[0], "TEXT", map[string]string{}) {
+					t += strings.TrimSpace(text.Data)
+				}
+				if t != "" {
+					fmt.Println(t)
+				}
+			}
+		}
 	} else if *reply {
 		tweets, err := getTweets(token, "https://api.twitter.com/1/statuses/mentions.json", map[string]string{})
 		if err != nil {
