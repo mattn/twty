@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/garyburd/twister/oauth"
 	"github.com/garyburd/twister/web"
-	iconv "github.com/sloonz/go-iconv/src"
+	"github.com/mattn/go-iconv/iconv"
 	"http"
 	"io/ioutil"
 	"json"
