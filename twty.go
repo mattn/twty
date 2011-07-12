@@ -21,18 +21,18 @@ import (
 
 type Tweet struct {
 	Text       string
-	Identifier string "id_str"
+	Identifier string `json:"id_str"`
 	Source     string
-	CreatedAt  string "created_at"
+	CreatedAt  string `json:"created_at"`
 	User       struct {
 		Name            string
-		ScreenName      string "screen_name"
-		FollowersCount  int    "followers_count"
-		ProfileImageURL string "profile_image_url"
+		ScreenName      string `json:"screen_name"`
+		FollowersCount  int    `json:"followers_count"`
+		ProfileImageURL string `json:"profile_image_url"`
 	}
 	Place *struct {
 		Id       string
-		FullName string "full_name"
+		FullName string `json:"full_name"`
 	}
 	Entities struct {
 		HashTags []struct {
@@ -41,8 +41,8 @@ type Tweet struct {
 		}
 		UserMentions []struct {
 			Indices    [2]int
-			ScreenName string "screen_name"
-		}    "user_mentions"
+			ScreenName string `json:"screen_name"`
+		}    `json:"user_mentions"`
 		Urls []struct {
 			Indices [2]int
 			Url     string
