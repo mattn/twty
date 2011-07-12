@@ -178,7 +178,7 @@ func convert_utf8(s string) string {
 func showRSS(rss RSS) {
 	items := rss.Channel.Item
 	for i := len(items) - 1; i >= 0; i-- {
-		user := strings.Split(items[i].Author, "@", 2)[0]
+		user := strings.SplitN(items[i].Author, "@", 2)[0]
 		user = convert_utf8(user)
 		text := convert_utf8(items[i].Title)
 		fmt.Println(user + ": " + text)
@@ -320,7 +320,7 @@ func main() {
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*list) > 0 {
-		part := strings.Split(*list, "/", 2)
+		part := strings.SplitN(*list, "/", 2)
 		tweets, err := getTweets(token, "https://api.twitter.com/1/"+part[0]+"/lists/"+part[1]+"/statuses.json", map[string]string{})
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
