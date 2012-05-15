@@ -2,21 +2,22 @@ package main
 
 import (
 	"bufio"
-	"exec"
+	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"github.com/garyburd/twister/oauth"
 	"github.com/garyburd/twister/web"
 	"github.com/mattn/go-iconv"
-	"http"
 	"io/ioutil"
-	"json"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
-	"xml"
 )
 
 type Tweet struct {
@@ -72,17 +73,17 @@ var oauthClient = oauth.Client{
 	TokenRequestURI:               "https://api.twitter.com/oauth/access_token",
 }
 
-func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, os.Error) {
+func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	cmd := "xdg-open"
-	url := oauthClient.AuthorizationURL(requestToken)
+	url_ := oauthClient.AuthorizationURL(requestToken)
 
-	args := []string{cmd, url}
+	args := []string{cmd, url_}
 	if syscall.OS == "windows" {
 		cmd = "rundll32.exe"
-		args = []string{cmd, "url.dll,FileProtocolHandler", url}
+		args = []string{cmd, "url.dll,FileProtocolHandler", url_}
 	} else if syscall.OS == "darwin" {
 		cmd = "open"
-		args = []string{cmd, url}
+		args = []string{cmd, url_}
 	}
 	cmd, err := exec.LookPath(cmd)
 	if err != nil {
@@ -113,7 +114,7 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, os.Error) 
 	return accessToken, nil
 }
 
-func getAccessToken(config map[string]string) (*oauth.Credentials, bool, os.Error) {
+func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) {
 	oauthClient.Credentials.Token = config["ClientToken"]
 	oauthClient.Credentials.Secret = config["ClientSecret"]
 
@@ -142,14 +143,14 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, os.Erro
 	return token, authorized, nil
 }
 
-func getTweets(token *oauth.Credentials, url string, opt map[string]string) ([]Tweet, os.Error) {
+func getTweets(token *oauth.Credentials, url_ string, opt map[string]string) ([]Tweet, error) {
 	param := make(web.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
-	oauthClient.SignParam(token, "GET", url, param)
-	url = url + "?" + param.FormEncodedString()
-	res, err := http.Get(url)
+	oauthClient.SignParam(token, "GET", url_, param)
+	url_ = url_ + "?" + param.FormEncodedString()
+	res, err := http.Get(url_)
 	if err != nil {
 		return nil, err
 	}
@@ -210,13 +211,13 @@ func showTweets(tweets []Tweet, verbose bool) {
 	}
 }
 
-func postTweet(token *oauth.Credentials, url string, opt map[string]string) os.Error {
+func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) error {
 	param := make(web.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
-	oauthClient.SignParam(token, "POST", url, param)
-	res, err := http.PostForm(url, http.Values(param))
+	oauthClient.SignParam(token, "POST", url_, param)
+	res, err := http.PostForm(url_, url.Values(param))
 	if err != nil {
 		log.Println("failed to post tweet:", err)
 		return err
@@ -302,7 +303,7 @@ func main() {
 	}
 
 	if len(*search) > 0 {
-		res, err := http.Get("http://search.twitter.com/search.rss?q=" + http.URLEscape(*search))
+		res, err := http.Get("http://search.twitter.com/search.rss?q=" + url.QueryEscape(*search))
 		if err != nil {
 			log.Fatal("failed to search word:", err)
 		}
