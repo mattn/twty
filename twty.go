@@ -6,8 +6,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
-	"github.com/garyburd/twister/oauth"
-	"github.com/garyburd/twister/web"
+	"github.com/garyburd/go-oauth/oauth"
 	"github.com/mattn/go-iconv"
 	"io/ioutil"
 	"log"
@@ -17,7 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
+	"runtime"
 )
 
 type Tweet struct {
@@ -43,7 +42,7 @@ type Tweet struct {
 		UserMentions []struct {
 			Indices    [2]int
 			ScreenName string `json:"screen_name"`
-		}    `json:"user_mentions"`
+		} `json:"user_mentions"`
 		Urls []struct {
 			Indices [2]int
 			Url     string
@@ -75,13 +74,13 @@ var oauthClient = oauth.Client{
 
 func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	cmd := "xdg-open"
-	url_ := oauthClient.AuthorizationURL(requestToken)
+	url_ := oauthClient.AuthorizationURL(requestToken, nil)
 
 	args := []string{cmd, url_}
-	if syscall.OS == "windows" {
+	if runtime.GOOS == "windows" {
 		cmd = "rundll32.exe"
 		args = []string{cmd, "url.dll,FileProtocolHandler", url_}
-	} else if syscall.OS == "darwin" {
+	} else if runtime.GOOS == "darwin" {
 		cmd = "open"
 		args = []string{cmd, url_}
 	}
@@ -125,7 +124,7 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	if foundToken && foundSecret {
 		token = &oauth.Credentials{accessToken, accessSecert}
 	} else {
-		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "")
+		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "", nil)
 		if err != nil {
 			log.Print("failed to request temporary credentials:", err)
 			return nil, false, err
@@ -144,12 +143,12 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 }
 
 func getTweets(token *oauth.Credentials, url_ string, opt map[string]string) ([]Tweet, error) {
-	param := make(web.Values)
+	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
 	oauthClient.SignParam(token, "GET", url_, param)
-	url_ = url_ + "?" + param.FormEncodedString()
+	url_ = url_ + "?" + param.Encode()
 	res, err := http.Get(url_)
 	if err != nil {
 		return nil, err
@@ -212,7 +211,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 }
 
 func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) error {
-	param := make(web.Values)
+	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
@@ -233,7 +232,7 @@ func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) err
 func getConfig() (string, map[string]string) {
 	home := os.Getenv("HOME")
 	dir := filepath.Join(home, ".config")
-	if syscall.OS == "windows" {
+	if runtime.GOOS == "windows" {
 		home = os.Getenv("USERPROFILE")
 		dir = filepath.Join(home, "Application Data")
 	}
@@ -309,7 +308,7 @@ func main() {
 		}
 		defer res.Body.Close()
 		var rss RSS
-		err = xml.Unmarshal(res.Body, &rss)
+		err = xml.NewDecoder(res.Body).Decode(&res)
 		if err != nil {
 			log.Fatal("could not unmarhal response:", err)
 		}
