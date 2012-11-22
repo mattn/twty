@@ -8,29 +8,15 @@ Install:
     for japanese: http://golang.jp/install
     for windows user: http://code.google.com/p/gomingw/downloads/list
 
-    And install twister.
+  2. get twty
 
-    # goinstall github.com/garyburd/twister/oauth
+    git get github.com/mattn/twty
 
-    And install go-iconv.
-
-    # git clone https://github.com/sloonz/go-iconv.git
-    # cd go-iconv
-    # make install
-
-    That's all!
-
-  2. get source
-
-    git clone https://github.com/mattn/twty.git
-
-  3. build
-
-    # make
+    Thanks all!
 
 Usage:
 
-    # ./twty -h
+    # twty -h
 
     At the first, you can see the opening web-browser.  And you'll see
     pin-code is shown on twitter.com.  Please copy it and type in console
