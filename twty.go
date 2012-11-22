@@ -14,8 +14,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"runtime"
+	"strings"
 )
 
 type Tweet struct {
