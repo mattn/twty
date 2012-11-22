@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/garyburd/go-oauth/oauth"
-	"github.com/mattn/go-iconv"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -165,22 +164,11 @@ func getTweets(token *oauth.Credentials, url_ string, opt map[string]string) ([]
 	return tweets, nil
 }
 
-func convert_utf8(s string) string {
-	ic, err := iconv.Open("char", "UTF-8")
-	if err != nil {
-		return s
-	}
-	defer ic.Close()
-	ret, _ := ic.Conv(s)
-	return ret
-}
-
 func showRSS(rss RSS) {
 	items := rss.Channel.Item
 	for i := len(items) - 1; i >= 0; i-- {
 		user := strings.SplitN(items[i].Author, "@", 2)[0]
-		user = convert_utf8(user)
-		text := convert_utf8(items[i].Title)
+		text := items[i].Title
 		fmt.Println(user + ": " + text)
 	}
 }
@@ -188,13 +176,12 @@ func showRSS(rss RSS) {
 func showTweets(tweets []Tweet, verbose bool) {
 	if verbose {
 		for i := len(tweets) - 1; i >= 0; i-- {
-			name := convert_utf8(tweets[i].User.Name)
-			user := convert_utf8(tweets[i].User.ScreenName)
+			name := tweets[i].User.Name
+			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
 			text = strings.Replace(text, "\r", "", -1)
 			text = strings.Replace(text, "\n", " ", -1)
 			text = strings.Replace(text, "\t", " ", -1)
-			text = convert_utf8(text)
 			fmt.Println(user + ": " + name)
 			fmt.Println("  " + text)
 			fmt.Println("  " + tweets[i].Identifier)
@@ -203,8 +190,8 @@ func showTweets(tweets []Tweet, verbose bool) {
 		}
 	} else {
 		for i := len(tweets) - 1; i >= 0; i-- {
-			user := convert_utf8(tweets[i].User.ScreenName)
-			text := convert_utf8(tweets[i].Text)
+			user := tweets[i].User.ScreenName
+			text := tweets[i].Text
 			fmt.Println(user + ": " + text)
 		}
 	}
