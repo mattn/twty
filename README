@@ -10,7 +10,7 @@ Install:
 
   2. get twty
 
-    git get github.com/mattn/twty
+    go get github.com/mattn/twty
 
     Thanks all!
 
