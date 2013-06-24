@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"encoding/xml"
+	//"encoding/xml"
 	"flag"
 	"fmt"
 	"github.com/garyburd/go-oauth/oauth"
@@ -164,13 +164,29 @@ func getTweets(token *oauth.Credentials, url_ string, opt map[string]string) ([]
 	return tweets, nil
 }
 
-func showRSS(rss RSS) {
-	items := rss.Channel.Item
-	for i := len(items) - 1; i >= 0; i-- {
-		user := strings.SplitN(items[i].Author, "@", 2)[0]
-		text := items[i].Title
-		fmt.Println(user + ": " + text)
+func getStatuses(token *oauth.Credentials, url_ string, opt map[string]string) ([]Tweet, error) {
+	param := make(url.Values)
+	for k, v := range opt {
+		param.Set(k, v)
 	}
+	oauthClient.SignParam(token, "GET", url_, param)
+	url_ = url_ + "?" + param.Encode()
+	res, err := http.Get(url_)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return nil, err
+	}
+	var statuses struct {
+		Statuses []Tweet
+	}
+	err = json.NewDecoder(res.Body).Decode(&statuses)
+	if err != nil {
+		return nil, err
+	}
+	return statuses.Statuses, nil
 }
 
 func showTweets(tweets []Tweet, verbose bool) {
@@ -289,49 +305,43 @@ func main() {
 	}
 
 	if len(*search) > 0 {
-		res, err := http.Get("http://search.twitter.com/search.rss?q=" + url.QueryEscape(*search))
+		tweets, err := getStatuses(token, "https://api.twitter.com/1.1/search/tweets.json", map[string]string{"q": *search})
 		if err != nil {
-			log.Fatal("failed to search word:", err)
+			log.Fatal("failed to get tweets:", err)
 		}
-		defer res.Body.Close()
-		var rss RSS
-		err = xml.NewDecoder(res.Body).Decode(&res)
-		if err != nil {
-			log.Fatal("could not unmarhal response:", err)
-		}
-		showRSS(rss)
+		showTweets(tweets, *verbose)
 	} else if *reply {
-		tweets, err := getTweets(token, "https://api.twitter.com/1/statuses/mentions.json", map[string]string{})
+		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/mentions.json", map[string]string{})
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*list) > 0 {
 		part := strings.SplitN(*list, "/", 2)
-		tweets, err := getTweets(token, "https://api.twitter.com/1/"+part[0]+"/lists/"+part[1]+"/statuses.json", map[string]string{})
+		tweets, err := getTweets(token, "https://api.twitter.com/1.1/"+part[0]+"/lists/"+part[1]+"/statuses.json", map[string]string{})
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*user) > 0 {
-		tweets, err := getTweets(token, "https://api.twitter.com/1/statuses/user_timeline.json", map[string]string{"screen_name": *user})
+		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/user_timeline.json", map[string]string{"screen_name": *user})
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*favorite) > 0 {
-		postTweet(token, "https://api.twitter.com/1/favorites/create/"+*favorite+".json", map[string]string{})
+		postTweet(token, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id":  *favorite})
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
-			postTweet(token, "https://api.twitter.com/1/statuses/retweet/"+*inreply+".json", map[string]string{})
+			postTweet(token, "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", map[string]string{})
 		} else {
-			tweets, err := getTweets(token, "https://api.twitter.com/1/statuses/home_timeline.json", map[string]string{})
+			tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", map[string]string{})
 			if err != nil {
 				log.Fatal("failed to get tweets:", err)
 			}
 			showTweets(tweets, *verbose)
 		}
 	} else {
-		postTweet(token, "https://api.twitter.com/1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply})
+		postTweet(token, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply})
 	}
 }
