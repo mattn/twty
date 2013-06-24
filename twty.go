@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	//"encoding/xml"
 	"flag"
 	"fmt"
 	"github.com/garyburd/go-oauth/oauth"
@@ -274,6 +273,7 @@ func main() {
 	user := flag.String("u", "", "show user timeline")
 	favorite := flag.String("f", "", "specify favorite ID")
 	search := flag.String("s", "", "search word")
+	stream := flag.Bool("S", false, "stream timeline")
 	inreply := flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	verbose := flag.Bool("v", false, "detail display")
 	flag.Usage = func() {
@@ -282,6 +282,8 @@ func main() {
   -i ID: specify in-reply ID, if not specify text, it will be RT.
   -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
   -u USER: show user's timeline
+  -s WORD: search timeline
+  -S: stream timeline
   -r: show replies
   -v: detail display
 `)
@@ -333,6 +335,32 @@ func main() {
 		showTweets(tweets, *verbose)
 	} else if len(*favorite) > 0 {
 		postTweet(token, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id":  *favorite})
+	} else if *stream {
+		url_ := "https://userstream.twitter.com/1.1/user.json"
+		param := make(url.Values)
+		oauthClient.SignParam(token, "GET", url_, param)
+		url_ = url_ + "?" + param.Encode()
+		res, err := http.Get(url_)
+		if err != nil {
+			log.Fatal("failed to get tweets:", err)
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			log.Fatal("failed to get tweets:", err)
+		}
+		buf := bufio.NewReader(res.Body)
+		var last []byte
+		for {
+			b, _, err := buf.ReadLine()
+			last = append(last, b...)
+			var tweets [1]Tweet
+			err = json.Unmarshal(last, &tweets[0])
+			if err != nil {
+				continue
+			}
+			last = []byte{}
+			showTweets(tweets[:], *verbose)
+		}
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
 			postTweet(token, "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", map[string]string{})
