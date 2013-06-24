@@ -311,18 +311,20 @@ func main() {
 		}
 		showTweets(tweets, *verbose)
 	} else if *reply {
-		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/mentions.json", map[string]string{})
+		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", map[string]string{})
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*list) > 0 {
 		part := strings.SplitN(*list, "/", 2)
-		tweets, err := getTweets(token, "https://api.twitter.com/1.1/"+part[0]+"/lists/"+part[1]+"/statuses.json", map[string]string{})
-		if err != nil {
-			log.Fatal("failed to get tweets:", err)
+		if len(part) == 2 {
+			tweets, err := getTweets(token, "https://api.twitter.com/1.1/lists/statuses.json", map[string]string{"owner_screen_name": part[0], "slug": part[1]})
+			if err != nil {
+				log.Fatal("failed to get tweets:", err)
+			}
+			showTweets(tweets, *verbose)
 		}
-		showTweets(tweets, *verbose)
 	} else if len(*user) > 0 {
 		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/user_timeline.json", map[string]string{"screen_name": *user})
 		if err != nil {
