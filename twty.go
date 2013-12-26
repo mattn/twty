@@ -236,7 +236,10 @@ func getConfig() (string, map[string]string) {
 	dir := filepath.Join(home, ".config")
 	if runtime.GOOS == "windows" {
 		home = os.Getenv("USERPROFILE")
-		dir = filepath.Join(home, "Application Data")
+		dir = os.Getenv("APPDATA")
+		if dir == "" {
+			dir = filepath.Join(home, "Application Data")
+		}
 	}
 	_, err := os.Stat(dir)
 	if err != nil {
