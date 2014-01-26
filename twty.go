@@ -81,6 +81,8 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	} else if runtime.GOOS == "darwin" {
 		cmd = "open"
 		args = []string{cmd, url_}
+	} else if runtime.GOOS == "plan9" {
+		cmd = "plumb"
 	}
 	cmd, err := exec.LookPath(cmd)
 	if err != nil {
@@ -240,6 +242,9 @@ func getConfig() (string, map[string]string) {
 		if dir == "" {
 			dir = filepath.Join(home, "Application Data")
 		}
+	} else if runtime.GOOS == "plan9" {
+		home = os.Getenv("home")
+		dir = filepath.Join(home, ".config")
 	}
 	_, err := os.Stat(dir)
 	if err != nil {
@@ -337,7 +342,7 @@ func main() {
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*favorite) > 0 {
-		postTweet(token, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id":  *favorite})
+		postTweet(token, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": *favorite})
 	} else if *stream {
 		url_ := "https://userstream.twitter.com/1.1/user.json"
 		param := make(url.Values)
