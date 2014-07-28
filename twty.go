@@ -84,17 +84,17 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	} else if runtime.GOOS == "plan9" {
 		cmd = "plumb"
 	}
+	fmt.Println("Open this URL and enter PIN.", url_)
 	cmd, err := exec.LookPath(cmd)
-	if err != nil {
-		log.Fatal("command not found:", err)
+	if err == nil {
+		p, err := os.StartProcess(cmd, args, &os.ProcAttr{Dir: "", Files: []*os.File{nil, nil, os.Stderr}})
+		if err != nil {
+			log.Fatal("failed to start command:", err)
+		}
+		defer p.Release()
 	}
-	p, err := os.StartProcess(cmd, args, &os.ProcAttr{Dir: "", Files: []*os.File{nil, nil, os.Stderr}})
-	if err != nil {
-		log.Fatal("failed to start command:", err)
-	}
-	defer p.Release()
 
-	print("PIN: ")
+	fmt.Print("PIN: ")
 	stdin := bufio.NewReader(os.Stdin)
 	b, err := stdin.ReadBytes('\n')
 	if err != nil {
