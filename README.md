@@ -12,7 +12,7 @@ A command-line twitter client
 
 2. get twty
 
-    $ go get github.com/mattn/twty
+        $ go get github.com/mattn/twty
 
 Thanks all!
 
