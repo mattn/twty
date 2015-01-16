@@ -1,22 +1,24 @@
-# twty: command-line twitter client
+# twty
+
+A command-line twitter client
 
 ## Install
 
-1. install golang environment.
+1. Install golang environment.
 
-    see: http://golang.org/doc/install.html
-    for japanese: http://golang.jp/install
-    for windows user: http://code.google.com/p/gomingw/downloads/list
+ see: http://golang.org/doc/install.html
+ for japanese: http://golang.jp/install
+ for windows user: http://code.google.com/p/gomingw/downloads/list
 
 2. get twty
 
-    go get github.com/mattn/twty
+    $ go get github.com/mattn/twty
 
 Thanks all!
 
 ## Usage
 
-    # twty -h
+    $ twty -h
 
 At the first, you can see the opening web-browser.  And you'll see pin-code is
 shown on twitter.com.  Please copy it and type in console like following.
