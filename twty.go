@@ -367,7 +367,9 @@ func main() {
 				continue
 			}
 			last = []byte{}
-			showTweets(tweets[:], *verbose)
+			if tweets[0].Identifier != "" {
+				showTweets(tweets[:], *verbose)
+			}
 		}
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
