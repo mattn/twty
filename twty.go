@@ -216,7 +216,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
 			ct.ChangeColor(ct.Green, true, ct.None, false)
-			fmt.Print(user + ": " + text)
+			fmt.Print(user)
 			ct.ResetColor()
 			fmt.Print(": ")
 			ct.ChangeColor(ct.White, false, ct.None, false)
