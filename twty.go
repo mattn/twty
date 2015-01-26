@@ -19,34 +19,34 @@ import (
 )
 
 type Tweet struct {
-	Text       string
+	Text       string `json:"text"`
 	Identifier string `json:"id_str"`
-	Source     string
+	Source     string `json:"source"`
 	CreatedAt  string `json:"created_at"`
 	User       struct {
-		Name            string
+		Name            string `json:"name"`
 		ScreenName      string `json:"screen_name"`
 		FollowersCount  int    `json:"followers_count"`
 		ProfileImageURL string `json:"profile_image_url"`
-	}
+	} `json:"user"`
 	Place *struct {
-		Id       string
+		Id       string `json:"id"`
 		FullName string `json:"full_name"`
-	}
+	} `json:"place"`
 	Entities struct {
 		HashTags []struct {
-			Indices [2]int
-			Text    string
+			Indices [2]int `json:"indices"`
+			Text    string `json:"text"`
 		}
 		UserMentions []struct {
-			Indices    [2]int
+			Indices    [2]int `json:"indices"`
 			ScreenName string `json:"screen_name"`
 		} `json:"user_mentions"`
 		Urls []struct {
-			Indices [2]int
-			Url     string
-		}
-	}
+			Indices [2]int `json:"indices"`
+			Url     string `json:"url"`
+		} `json:"urls"`
+	} `json:"entities"`
 }
 
 type RSS struct {
