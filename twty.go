@@ -230,6 +230,13 @@ func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) err
 		log.Println("failed to get timeline:", err)
 		return err
 	}
+	var tweet Tweet
+	err = json.NewDecoder(res.Body).Decode(&tweet)
+	if err != nil {
+		log.Println("failed to parse new tweet:", err)
+		return err
+	}
+	log.Println("tweeted:", tweet.Identifier)
 	return nil
 }
 
