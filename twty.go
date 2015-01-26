@@ -248,7 +248,7 @@ func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) err
 		log.Println("failed to parse new tweet:", err)
 		return err
 	}
-	log.Println("tweeted:", tweet.Identifier)
+	fmt.Println("tweeted:", tweet.Identifier)
 	return nil
 }
 
