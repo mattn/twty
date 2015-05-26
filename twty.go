@@ -278,7 +278,7 @@ func getConfig() (string, map[string]string) {
 			log.Fatal("failed to create directory:", err)
 		}
 	}
-	file := filepath.Join(dir, "settings.json")
+	file := filepath.Join(dir, "settings"+*account+".json")
 	config := map[string]string{}
 
 	b, err := ioutil.ReadFile(file)
@@ -288,23 +288,28 @@ func getConfig() (string, map[string]string) {
 	} else {
 		err = json.Unmarshal(b, &config)
 		if err != nil {
-			log.Fatal("could not unmarhal settings.json:", err)
+			log.Fatal("could not unmarhal settings"+*account+".json:", err)
 		}
 	}
 	return file, config
 }
 
+var (
+	account  = flag.String("a", "", "account")
+	reply    = flag.Bool("r", false, "show replies")
+	list     = flag.String("l", "", "show tweets")
+	user     = flag.String("u", "", "show user timeline")
+	favorite = flag.String("f", "", "specify favorite ID")
+	search   = flag.String("s", "", "search word")
+	stream   = flag.Bool("S", false, "stream timeline")
+	inreply  = flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
+	verbose  = flag.Bool("v", false, "detail display")
+)
+
 func main() {
-	reply := flag.Bool("r", false, "show replies")
-	list := flag.String("l", "", "show tweets")
-	user := flag.String("u", "", "show user timeline")
-	favorite := flag.String("f", "", "specify favorite ID")
-	search := flag.String("s", "", "search word")
-	stream := flag.Bool("S", false, "stream timeline")
-	inreply := flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
-	verbose := flag.Bool("v", false, "detail display")
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage of twty:
+  -a ACCOUNT: switch account to load configuration file. Note: experimental
   -f ID: specify favorite ID
   -i ID: specify in-reply ID, if not specify text, it will be RT.
   -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
