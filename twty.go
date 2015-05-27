@@ -278,7 +278,12 @@ func getConfig() (string, map[string]string) {
 			log.Fatal("failed to create directory:", err)
 		}
 	}
-	file := filepath.Join(dir, "settings-"+*account+".json")
+	var file string
+	if *account != "" {
+		file = filepath.Join(dir, "settings.json")
+	} else {
+		file = filepath.Join(dir, "settings-"+*account+".json")
+	}
 	config := map[string]string{}
 
 	b, err := ioutil.ReadFile(file)
@@ -288,7 +293,7 @@ func getConfig() (string, map[string]string) {
 	} else {
 		err = json.Unmarshal(b, &config)
 		if err != nil {
-			log.Fatal("could not unmarhal settings-"+*account+".json:", err)
+			log.Fatal("could not unmarhal "+file+":", err)
 		}
 	}
 	return file, config
