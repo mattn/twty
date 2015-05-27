@@ -279,7 +279,7 @@ func getConfig() (string, map[string]string) {
 		}
 	}
 	var file string
-	if *account != "" {
+	if *account == "" {
 		file = filepath.Join(dir, "settings.json")
 	} else {
 		file = filepath.Join(dir, "settings-"+*account+".json")
