@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -327,6 +328,8 @@ func main() {
 	}
 	flag.Parse()
 
+	http.DefaultTransport.(*http.Transport).DisableCompression = true
+
 	file, config := getConfig()
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
@@ -385,7 +388,16 @@ func main() {
 		if res.StatusCode != 200 {
 			log.Fatal("failed to get tweets:", err)
 		}
-		buf := bufio.NewReader(res.Body)
+		var buf *bufio.Reader
+		if res.Header.Get("Content-Encoding") == "gzip" {
+			gr, err := gzip.NewReader(res.Body)
+			if err != nil {
+				log.Fatal("failed to make gzip decoder:", err)
+			}
+			buf = bufio.NewReader(gr)
+		} else {
+			buf = bufio.NewReader(res.Body)
+		}
 		var last []byte
 		for {
 			b, _, err := buf.ReadLine()
