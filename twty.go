@@ -4,10 +4,9 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"github.com/daviddengcn/go-colortext"
-	"github.com/garyburd/go-oauth/oauth"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,6 +16,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/daviddengcn/go-colortext"
+	"github.com/garyburd/go-oauth/oauth"
 )
 
 type Tweet struct {
@@ -73,44 +75,40 @@ var oauthClient = oauth.Client{
 }
 
 func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
-	cmd := "xdg-open"
+	var err error
+	browser := "xdg-open"
 	url_ := oauthClient.AuthorizationURL(requestToken, nil)
 
-	args := []string{cmd, url_}
+	args := []string{url_}
 	if runtime.GOOS == "windows" {
-		cmd = "rundll32.exe"
-		args = []string{cmd, "url.dll,FileProtocolHandler", url_}
+		browser = "rundll32.exe"
+		args = []string{"url.dll,FileProtocolHandler", url_}
 	} else if runtime.GOOS == "darwin" {
-		cmd = "open"
-		args = []string{cmd, url_}
+		browser = "open"
+		args = []string{url_}
 	} else if runtime.GOOS == "plan9" {
-		cmd = "plumb"
+		browser = "plumb"
 	}
 	ct.ChangeColor(ct.Red, true, ct.None, false)
-	fmt.Println("Open this URL and enter PIN.", url_)
+	fmt.Println("Open this URL and enter PIN.")
 	ct.ResetColor()
-	cmd, err := exec.LookPath(cmd)
+	fmt.Println(url_)
+	browser, err = exec.LookPath(browser)
 	if err == nil {
-		p, err := os.StartProcess(cmd, args, &os.ProcAttr{Dir: "", Files: []*os.File{nil, nil, os.Stderr}})
+		cmd := exec.Command(browser, args...)
+		cmd.Stderr = os.Stderr
+		err = cmd.Start()
 		if err != nil {
 			log.Fatal("failed to start command:", err)
 		}
-		defer p.Release()
 	}
 
 	fmt.Print("PIN: ")
-	stdin := bufio.NewReader(os.Stdin)
-	b, err := stdin.ReadBytes('\n')
-	if err != nil {
+	stdin := bufio.NewScanner(os.Stdin)
+	if !stdin.Scan() {
 		log.Fatal("canceled")
 	}
-
-	if b[len(b)-2] == '\r' {
-		b = b[0 : len(b)-2]
-	} else {
-		b = b[0 : len(b)-1]
-	}
-	accessToken, _, err := oauthClient.RequestToken(http.DefaultClient, requestToken, string(b))
+	accessToken, _, err := oauthClient.RequestToken(http.DefaultClient, requestToken, stdin.Text())
 	if err != nil {
 		log.Fatal("failed to request token:", err)
 	}
@@ -159,14 +157,11 @@ func getTweets(token *oauth.Credentials, url_ string, opt map[string]string) ([]
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, err
+		return nil, errors.New(res.Status)
 	}
 	var tweets []Tweet
 	err = json.NewDecoder(res.Body).Decode(&tweets)
-	if err != nil {
-		return nil, err
-	}
-	return tweets, nil
+	return tweets, err
 }
 
 func getStatuses(token *oauth.Credentials, url_ string, opt map[string]string) ([]Tweet, error) {
@@ -182,17 +177,20 @@ func getStatuses(token *oauth.Credentials, url_ string, opt map[string]string) (
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, err
+		return nil, errors.New(res.Status)
 	}
 	var statuses struct {
 		Statuses []Tweet
 	}
 	err = json.NewDecoder(res.Body).Decode(&statuses)
-	if err != nil {
-		return nil, err
-	}
-	return statuses.Statuses, nil
+	return statuses.Statuses, err
 }
+
+var replacer = strings.NewReplacer(
+	"\r", "",
+	"\n", " ",
+	"\t", " ",
+)
 
 func showTweets(tweets []Tweet, verbose bool) {
 	if verbose {
@@ -200,9 +198,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 			name := tweets[i].User.Name
 			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
-			text = strings.Replace(text, "\r", "", -1)
-			text = strings.Replace(text, "\n", " ", -1)
-			text = strings.Replace(text, "\t", " ", -1)
+			text = replacer.Replace(text)
 			ct.ChangeColor(ct.Green, true, ct.None, false)
 			fmt.Println(user + ": " + name)
 			ct.ChangeColor(ct.White, false, ct.None, false)
