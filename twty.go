@@ -290,7 +290,7 @@ func getConfig() (string, map[string]string) {
 	} else {
 		err = json.Unmarshal(b, &config)
 		if err != nil {
-			log.Fatal("could not unmarhal "+file+":", err)
+			log.Fatalf("could not unmarhal %v: %v", file, err)
 		}
 	}
 	return file, config
