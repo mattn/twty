@@ -17,7 +17,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/daviddengcn/go-colortext"
+	"github.com/fatih/color"
 	"github.com/garyburd/go-oauth/oauth"
 )
 
@@ -89,9 +89,9 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	} else if runtime.GOOS == "plan9" {
 		browser = "plumb"
 	}
-	ct.ChangeColor(ct.Red, true, ct.None, false)
+	color.Set(color.FgHiRed)
 	fmt.Println("Open this URL and enter PIN.")
-	ct.ResetColor()
+	color.Set(color.Reset)
 	fmt.Println(url_)
 	browser, err = exec.LookPath(browser)
 	if err == nil {
@@ -199,26 +199,26 @@ func showTweets(tweets []Tweet, verbose bool) {
 			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
 			text = replacer.Replace(text)
-			ct.ChangeColor(ct.Green, true, ct.None, false)
+			color.Set(color.FgHiGreen)
 			fmt.Println(user + ": " + name)
-			ct.ChangeColor(ct.White, false, ct.None, false)
+			color.Set(color.FgHiWhite)
 			fmt.Println("  " + text)
 			fmt.Println("  " + tweets[i].Identifier)
 			fmt.Println("  " + tweets[i].CreatedAt)
 			fmt.Println()
-			ct.ResetColor()
+			color.Set(color.Reset)
 		}
 	} else {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
-			ct.ChangeColor(ct.Green, true, ct.None, false)
+			color.Set(color.FgHiGreen)
 			fmt.Print(user)
-			ct.ResetColor()
+			color.Set(color.Reset)
 			fmt.Print(": ")
-			ct.ChangeColor(ct.White, false, ct.None, false)
+			color.Set(color.FgHiWhite)
 			fmt.Println(text)
-			ct.ResetColor()
+			color.Set(color.Reset)
 		}
 	}
 }
