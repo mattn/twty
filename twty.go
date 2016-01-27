@@ -193,7 +193,9 @@ var replacer = strings.NewReplacer(
 )
 
 func showTweets(tweets []Tweet, verbose bool) {
-	if verbose {
+	if *asjson {
+		json.NewEncoder(os.Stdout).Encode(tweets)
+	} else if verbose {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			name := tweets[i].User.Name
 			user := tweets[i].User.ScreenName
@@ -297,6 +299,7 @@ var (
 	account  = flag.String("a", "", "account")
 	reply    = flag.Bool("r", false, "show replies")
 	list     = flag.String("l", "", "show tweets")
+	asjson   = flag.Bool("json", false, "show tweets as json")
 	user     = flag.String("u", "", "show user timeline")
 	favorite = flag.String("f", "", "specify favorite ID")
 	search   = flag.String("s", "", "search word")
@@ -314,6 +317,7 @@ func main() {
   -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
   -u USER: show user's timeline
   -s WORD: search timeline
+  -json: as JSON
   -S: stream timeline
   -r: show replies
   -v: detail display
