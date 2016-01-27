@@ -199,7 +199,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
 			text = replacer.Replace(text)
-			color.Set(color.FgHiGreen)
+			color.Set(color.FgHiRed)
 			fmt.Println(user + ": " + name)
 			color.Set(color.Reset)
 			fmt.Println("  " + text)
@@ -211,11 +211,10 @@ func showTweets(tweets []Tweet, verbose bool) {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			user := tweets[i].User.ScreenName
 			text := tweets[i].Text
-			color.Set(color.FgHiGreen)
+			color.Set(color.FgHiRed)
 			fmt.Print(user)
 			color.Set(color.Reset)
 			fmt.Print(": ")
-			color.Set(color.Reset)
 			fmt.Println(text)
 		}
 	}
