@@ -201,12 +201,11 @@ func showTweets(tweets []Tweet, verbose bool) {
 			text = replacer.Replace(text)
 			color.Set(color.FgHiGreen)
 			fmt.Println(user + ": " + name)
-			color.Set(color.FgHiWhite)
+			color.Set(color.Reset)
 			fmt.Println("  " + text)
 			fmt.Println("  " + tweets[i].Identifier)
 			fmt.Println("  " + tweets[i].CreatedAt)
 			fmt.Println()
-			color.Set(color.Reset)
 		}
 	} else {
 		for i := len(tweets) - 1; i >= 0; i-- {
@@ -216,9 +215,8 @@ func showTweets(tweets []Tweet, verbose bool) {
 			fmt.Print(user)
 			color.Set(color.Reset)
 			fmt.Print(": ")
-			color.Set(color.FgHiWhite)
-			fmt.Println(text)
 			color.Set(color.Reset)
+			fmt.Println(text)
 		}
 	}
 }
@@ -324,8 +322,6 @@ func main() {
 	}
 	flag.Parse()
 
-	http.DefaultTransport.(*http.Transport).DisableCompression = true
-
 	file, config := getConfig()
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
@@ -345,7 +341,7 @@ func main() {
 	if len(*search) > 0 {
 		tweets, err := getStatuses(token, "https://api.twitter.com/1.1/search/tweets.json", map[string]string{"q": *search})
 		if err != nil {
-			log.Fatal("failed to get tweets:", err)
+			log.Fatal("failed to get statuses:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if *reply {
