@@ -122,9 +122,9 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	authorized := false
 	var token *oauth.Credentials
 	accessToken, foundToken := config["AccessToken"]
-	accessSecert, foundSecret := config["AccessSecret"]
+	accessSecret, foundSecret := config["AccessSecret"]
 	if foundToken && foundSecret {
-		token = &oauth.Credentials{accessToken, accessSecert}
+		token = &oauth.Credentials{accessToken, accessSecret}
 	} else {
 		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "", nil)
 		if err != nil {
