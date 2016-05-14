@@ -249,17 +249,14 @@ func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) err
 }
 
 func getConfig() (string, map[string]string) {
-	home := os.Getenv("HOME")
-	dir := filepath.Join(home, ".config")
+	var dir string
 	if runtime.GOOS == "windows" {
-		home = os.Getenv("USERPROFILE")
 		dir = os.Getenv("APPDATA")
 		if dir == "" {
-			dir = filepath.Join(home, "Application Data")
+			dir = filepath.Join(os.Getenv("USERPROFILE"), "Application Data")
 		}
 	} else if runtime.GOOS == "plan9" {
-		home = os.Getenv("home")
-		dir = filepath.Join(home, ".config")
+		dir = filepath.Join(os.Getenv("HOME"), ".config")
 	}
 	_, err := os.Stat(dir)
 	if err != nil {
