@@ -99,18 +99,18 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 		cmd.Stderr = os.Stderr
 		err = cmd.Start()
 		if err != nil {
-			log.Fatal("failed to start command:", err)
+			return nil, fmt.Errorf("failed to start command:", err)
 		}
 	}
 
 	fmt.Print("PIN: ")
 	stdin := bufio.NewScanner(os.Stdin)
 	if !stdin.Scan() {
-		log.Fatal("canceled")
+		return nil, fmt.Errorf("canceled")
 	}
 	accessToken, _, err := oauthClient.RequestToken(http.DefaultClient, requestToken, stdin.Text())
 	if err != nil {
-		log.Fatal("failed to request token:", err)
+		return nil, fmt.Errorf("failed to request token:", err)
 	}
 	return accessToken, nil
 }
@@ -248,7 +248,7 @@ func postTweet(token *oauth.Credentials, url_ string, opt map[string]string) err
 	return nil
 }
 
-func getConfig() (string, map[string]string) {
+func getConfig() (string, map[string]string, error) {
 	var dir string
 	if runtime.GOOS == "windows" {
 		dir = os.Getenv("APPDATA")
@@ -259,7 +259,7 @@ func getConfig() (string, map[string]string) {
 		dir = filepath.Join(os.Getenv("HOME"), ".config", "twty")
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		log.Fatal("failed to create directory:", err)
+		return "", nil, err
 	}
 	var file string
 	if *account == "" {
@@ -270,16 +270,19 @@ func getConfig() (string, map[string]string) {
 	config := map[string]string{}
 
 	b, err := ioutil.ReadFile(file)
+	if err != nil && !os.IsNotExist(err) {
+		return "", nil, err
+	}
 	if err != nil {
 		config["ClientToken"] = "MbartJkKCrSegn45xK9XLw"
 		config["ClientSecret"] = "1nI3dHFtK9UY1kL6UEYWk6r2lFEcNHWhk7MtXe7eo"
 	} else {
 		err = json.Unmarshal(b, &config)
 		if err != nil {
-			log.Fatalf("could not unmarshal %v: %v", file, err)
+			return "", nil, fmt.Errorf("could not unmarshal %v: %v", file, err)
 		}
 	}
-	return file, config
+	return file, config, nil
 }
 
 var (
@@ -312,7 +315,10 @@ func main() {
 	}
 	flag.Parse()
 
-	file, config := getConfig()
+	file, config, err := getConfig()
+	if err != nil {
+		log.Fatal("failed to get configuration:", err)
+	}
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
 		log.Fatal("faild to get access token:", err)
