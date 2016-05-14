@@ -253,23 +253,13 @@ func getConfig() (string, map[string]string) {
 	if runtime.GOOS == "windows" {
 		dir = os.Getenv("APPDATA")
 		if dir == "" {
-			dir = filepath.Join(os.Getenv("USERPROFILE"), "Application Data")
+			dir = filepath.Join(os.Getenv("USERPROFILE"), "Application Data", "twty")
 		}
 	} else if runtime.GOOS == "plan9" {
-		dir = filepath.Join(os.Getenv("HOME"), ".config")
+		dir = filepath.Join(os.Getenv("HOME"), ".config", "twty")
 	}
-	_, err := os.Stat(dir)
-	if err != nil {
-		if os.Mkdir(dir, 0700) != nil {
-			log.Fatal("failed to create directory:", err)
-		}
-	}
-	dir = filepath.Join(dir, "twty")
-	_, err = os.Stat(dir)
-	if err != nil {
-		if os.Mkdir(dir, 0700) != nil {
-			log.Fatal("failed to create directory:", err)
-		}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		log.Fatal("failed to create directory:", err)
 	}
 	var file string
 	if *account == "" {
