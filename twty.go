@@ -178,12 +178,12 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	} else {
 		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "", nil)
 		if err != nil {
-			log.Print("failed to request temporary credentials:", err)
+			err = fmt.Errorf("failed to request temporary credentials: %v", err)
 			return nil, false, err
 		}
 		token, err = clientAuth(requestToken)
 		if err != nil {
-			log.Print("failed to request temporary credentials:", err)
+			err = fmt.Errorf("failed to request temporary credentials: %v", err)
 			return nil, false, err
 		}
 
