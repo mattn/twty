@@ -255,7 +255,7 @@ func getConfig() (string, map[string]string, error) {
 		if dir == "" {
 			dir = filepath.Join(os.Getenv("USERPROFILE"), "Application Data", "twty")
 		}
-	} else if runtime.GOOS == "plan9" {
+	} else {
 		dir = filepath.Join(os.Getenv("HOME"), ".config", "twty")
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
