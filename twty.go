@@ -390,6 +390,9 @@ func main() {
 		if err != nil {
 			log.Fatal("failed to create favorite:", err)
 		}
+		color.Set(color.FgHiRed)
+		fmt.Print("❤")
+		color.Set(color.Reset)
 		fmt.Println("favorited")
 	} else if *stream {
 		url_ := "https://userstream.twitter.com/1.1/user.json"
@@ -435,6 +438,9 @@ func main() {
 			if err != nil {
 				log.Fatal("failed to retweet:", err)
 			}
+			color.Set(color.FgHiYellow)
+			fmt.Print("⚡")
+			color.Set(color.Reset)
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
