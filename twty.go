@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -333,6 +334,7 @@ var (
 	debug    = flag.Bool("debug", false, "debug json")
 
 	fromfile = flag.String("ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
+	count    = flag.String("count", "", "fetch tweets count")
 )
 
 func readFile(filename string) ([]byte, error) {
@@ -341,6 +343,16 @@ func readFile(filename string) ([]byte, error) {
 	} else {
 		return ioutil.ReadFile(filename)
 	}
+}
+
+func countToOpt(opt map[string]string, count *string) map[string]string {
+	if count != nil && *count != "" {
+		_, err := strconv.Atoi(*count)
+		if err == nil {
+			opt["count"] = *count
+		}
+	}
+	return opt
 }
 
 func main() {
@@ -385,14 +397,14 @@ func main() {
 			Statuses       []Tweet `json:"statuses"`
 			SearchMetadata `json:"search_metadata"`
 		}{}
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", map[string]string{"q": *search}, &res)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", countToOpt(map[string]string{"q": *search}, count), &res)
 		if err != nil {
 			log.Fatal("failed to get statuses:", err)
 		}
 		showTweets(res.Statuses, *verbose)
 	} else if *reply {
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/mentions_timeline.json", map[string]string{}, &tweets)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
@@ -408,20 +420,20 @@ func main() {
 			part = []string{account.ScreenName, part[0]}
 		}
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", map[string]string{"owner_screen_name": part[0], "slug": part[1]}, &tweets)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", countToOpt(map[string]string{"owner_screen_name": part[0], "slug": part[1]}, count), &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*user) > 0 {
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", map[string]string{"screen_name": *user}, &tweets)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", countToOpt(map[string]string{"screen_name": *user}, count), &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*favorite) > 0 {
-		err := rawCall(token, "POST", "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": *favorite}, nil)
+		err := rawCall(token, "POST", "https://api.twitter.com/1.1/favorites/create.json", countToOpt(map[string]string{"id": *favorite}, count), nil)
 		if err != nil {
 			log.Fatal("failed to create favorite:", err)
 		}
@@ -480,7 +492,7 @@ func main() {
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
 			var tweet Tweet
-			err := rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", map[string]string{}, &tweet)
+			err := rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", countToOpt(map[string]string{}, count), &tweet)
 			if err != nil {
 				log.Fatal("failed to retweet:", err)
 			}
@@ -490,7 +502,7 @@ func main() {
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
-			err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/home_timeline.json", map[string]string{}, &tweets)
+			err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 			if err != nil {
 				log.Fatal("failed to get tweets:", err)
 			}
@@ -498,7 +510,7 @@ func main() {
 		}
 	} else {
 		var tweet Tweet
-		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, &tweet)
+		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", countToOpt(map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, count), &tweet)
 		if err != nil {
 			log.Fatal("failed to post tweet:", err)
 		}
