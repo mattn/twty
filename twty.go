@@ -21,6 +21,7 @@ import (
 	"github.com/garyburd/go-oauth/oauth"
 )
 
+// Account hold information about account
 type Account struct {
 	TimeZone struct {
 		Name       string `json:"name"`
@@ -59,6 +60,7 @@ type Account struct {
 	} `json:"trend_location"`
 }
 
+// Tweet hold information about tweet
 type Tweet struct {
 	Text       string `json:"text"`
 	Identifier string `json:"id_str"`
@@ -71,7 +73,7 @@ type Tweet struct {
 		ProfileImageURL string `json:"profile_image_url"`
 	} `json:"user"`
 	Place *struct {
-		Id       string `json:"id"`
+		ID       string `json:"id"`
 		FullName string `json:"full_name"`
 	} `json:"place"`
 	Entities struct {
@@ -85,11 +87,12 @@ type Tweet struct {
 		} `json:"user_mentions"`
 		Urls []struct {
 			Indices [2]int `json:"indices"`
-			Url     string `json:"url"`
+			URL     string `json:"url"`
 		} `json:"urls"`
 	} `json:"entities"`
 }
 
+// SearchMetadata hold information about search metadata
 type SearchMetadata struct {
 	CompletedIn float64 `json:"completed_in"`
 	MaxID       int64   `json:"max_id"`
@@ -102,6 +105,7 @@ type SearchMetadata struct {
 	SinceIDStr  string  `json:"since_id_str"`
 }
 
+// RSS hold information about RSS
 type RSS struct {
 	Channel struct {
 		Title       string
@@ -112,7 +116,7 @@ type RSS struct {
 			Description string
 			PubDate     string
 			Link        []string
-			Guid        string
+			GUID        string
 			Author      string
 		}
 	}
@@ -127,29 +131,29 @@ var oauthClient = oauth.Client{
 func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	var err error
 	browser := "xdg-open"
-	url_ := oauthClient.AuthorizationURL(requestToken, nil)
+	url := oauthClient.AuthorizationURL(requestToken, nil)
 
-	args := []string{url_}
+	args := []string{url}
 	if runtime.GOOS == "windows" {
 		browser = "rundll32.exe"
-		args = []string{"url.dll,FileProtocolHandler", url_}
+		args = []string{"url.dll,FileProtocolHandler", url}
 	} else if runtime.GOOS == "darwin" {
 		browser = "open"
-		args = []string{url_}
+		args = []string{url}
 	} else if runtime.GOOS == "plan9" {
 		browser = "plumb"
 	}
 	color.Set(color.FgHiRed)
 	fmt.Println("Open this URL and enter PIN.")
 	color.Set(color.Reset)
-	fmt.Println(url_)
+	fmt.Println(url)
 	browser, err = exec.LookPath(browser)
 	if err == nil {
 		cmd := exec.Command(browser, args...)
 		cmd.Stderr = os.Stderr
 		err = cmd.Start()
 		if err != nil {
-			return nil, fmt.Errorf("failed to start command:", err)
+			return nil, fmt.Errorf("failed to start command: %v", err)
 		}
 	}
 
@@ -160,7 +164,7 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	}
 	accessToken, _, err := oauthClient.RequestToken(http.DefaultClient, requestToken, stdin.Text())
 	if err != nil {
-		return nil, fmt.Errorf("failed to request token:", err)
+		return nil, fmt.Errorf("failed to request token: %v", err)
 	}
 	return accessToken, nil
 }
@@ -174,7 +178,7 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	accessToken, foundToken := config["AccessToken"]
 	accessSecret, foundSecret := config["AccessSecret"]
 	if foundToken && foundSecret {
-		token = &oauth.Credentials{accessToken, accessSecret}
+		token = &oauth.Credentials{Token: accessToken, Secret: accessSecret}
 	} else {
 		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "", nil)
 		if err != nil {
@@ -194,19 +198,19 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	return token, authorized, nil
 }
 
-func rawCall(token *oauth.Credentials, method string, url_ string, opt map[string]string, res interface{}) error {
+func rawCall(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
 	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
-	oauthClient.SignParam(token, method, url_, param)
+	oauthClient.SignParam(token, method, uri, param)
 	var resp *http.Response
 	var err error
 	if method == "GET" {
-		url_ = url_ + "?" + param.Encode()
-		resp, err = http.Get(url_)
+		uri = uri + "?" + param.Encode()
+		resp, err = http.Get(uri)
 	} else {
-		resp, err = http.PostForm(url_, url.Values(param))
+		resp, err = http.PostForm(uri, url.Values(param))
 	}
 	if err != nil {
 		return err
@@ -347,7 +351,7 @@ func main() {
 
 	if len(*search) > 0 {
 		res := struct {
-			Statuses       []Tweet `statuses`
+			Statuses       []Tweet `json:"statuses"`
 			SearchMetadata `json:"search_metadata"`
 		}{}
 		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", map[string]string{"q": *search}, &res)
@@ -395,11 +399,11 @@ func main() {
 		color.Set(color.Reset)
 		fmt.Println("favorited")
 	} else if *stream {
-		url_ := "https://userstream.twitter.com/1.1/user.json"
+		uri := "https://userstream.twitter.com/1.1/user.json"
 		param := make(url.Values)
-		oauthClient.SignParam(token, "GET", url_, param)
-		url_ = url_ + "?" + param.Encode()
-		resp, err := http.Get(url_)
+		oauthClient.SignParam(token, "GET", uri, param)
+		uri = uri + "?" + param.Encode()
+		resp, err := http.Get(uri)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
