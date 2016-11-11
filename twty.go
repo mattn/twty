@@ -235,6 +235,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 	if *asjson {
 		for _, tweet := range tweets {
 			json.NewEncoder(os.Stdout).Encode(tweet)
+			os.Stdout.Sync()
 		}
 	} else if verbose {
 		for i := len(tweets) - 1; i >= 0; i-- {
