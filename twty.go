@@ -233,7 +233,9 @@ var replacer = strings.NewReplacer(
 
 func showTweets(tweets []Tweet, verbose bool) {
 	if *asjson {
-		json.NewEncoder(os.Stdout).Encode(tweets)
+		for _, tweet := range tweets {
+			json.NewEncoder(os.Stdout).Encode(tweet)
+		}
 	} else if verbose {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			name := tweets[i].User.Name
