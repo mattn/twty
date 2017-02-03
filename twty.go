@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html"
 	"io"
 	"io/ioutil"
 	"log"
@@ -246,7 +247,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 			color.Set(color.FgHiRed)
 			fmt.Println(user + ": " + name)
 			color.Set(color.Reset)
-			fmt.Println("  " + text)
+			fmt.Println("  " + html.UnescapeString(text))
 			fmt.Println("  " + tweets[i].Identifier)
 			fmt.Println("  " + tweets[i].CreatedAt)
 			fmt.Println()
@@ -259,7 +260,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 			fmt.Print(user)
 			color.Set(color.Reset)
 			fmt.Print(": ")
-			fmt.Println(text)
+			fmt.Println(html.UnescapeString(text))
 		}
 	}
 }
