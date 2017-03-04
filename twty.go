@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/garyburd/go-oauth/oauth"
@@ -232,6 +233,16 @@ var replacer = strings.NewReplacer(
 	"\t", " ",
 )
 
+const TIME_LAYOUT = "Mon Jan 01 15:04:05 -0700 2006"
+
+func toLocalTime(timeStr string) string {
+	timeValue, err := time.Parse(TIME_LAYOUT, timeStr)
+	if err != nil {
+		return timeStr
+	}
+	return timeValue.Local().Format(TIME_LAYOUT)
+}
+
 func showTweets(tweets []Tweet, verbose bool) {
 	if *asjson {
 		for _, tweet := range tweets {
@@ -249,7 +260,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 			color.Set(color.Reset)
 			fmt.Println("  " + html.UnescapeString(text))
 			fmt.Println("  " + tweets[i].Identifier)
-			fmt.Println("  " + tweets[i].CreatedAt)
+			fmt.Println("  " + toLocalTime(tweets[i].CreatedAt))
 			fmt.Println()
 		}
 	} else {
