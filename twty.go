@@ -233,7 +233,7 @@ var replacer = strings.NewReplacer(
 	"\t", " ",
 )
 
-const TIME_LAYOUT = "Mon Jan 01 15:04:05 -0700 2006"
+const TIME_LAYOUT = "Mon Jan 02 15:04:05 -0700 2006"
 
 func toLocalTime(timeStr string) string {
 	timeValue, err := time.Parse(TIME_LAYOUT, timeStr)
