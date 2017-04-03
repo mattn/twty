@@ -23,6 +23,11 @@ import (
 	"github.com/garyburd/go-oauth/oauth"
 )
 
+const (
+	EMOJI_RED_HEART    = "\u2764"
+	EMOJI_HIGH_VOLTAGE = "\u26A1"
+)
+
 // Account hold information about account
 type Account struct {
 	TimeZone struct {
@@ -410,7 +415,7 @@ func main() {
 			log.Fatal("failed to create favorite:", err)
 		}
 		color.Set(color.FgHiRed)
-		fmt.Print("❤")
+		fmt.Print(EMOJI_RED_HEART)
 		color.Set(color.Reset)
 		fmt.Println("favorited")
 	} else if *stream {
@@ -458,7 +463,7 @@ func main() {
 				log.Fatal("failed to retweet:", err)
 			}
 			color.Set(color.FgHiYellow)
-			fmt.Print("⚡")
+			fmt.Print(EMOJI_HIGH_VOLTAGE)
 			color.Set(color.Reset)
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
