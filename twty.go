@@ -467,8 +467,7 @@ func main() {
 			}
 		}
 	} else if len(*fromfile) > 0 {
-		var text []byte
-		text, err = readFile(*fromfile)
+		text, err := readFile(*fromfile)
 		if err != nil {
 			log.Fatal("failed to read a new tweet:", err)
 		}
