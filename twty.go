@@ -331,6 +331,7 @@ var (
 	inreply  = flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	verbose  = flag.Bool("v", false, "detail display")
 	debug    = flag.Bool("debug", false, "debug json")
+	fromfile = flag.String("ff", "", "post text from file(\"-\" means STDIN)")
 )
 
 func main() {
@@ -346,6 +347,7 @@ func main() {
   -S: stream timeline
   -r: show replies
   -v: detail display
+  -ff FILENAME: post text from file("-" means STDIN)
 `)
 	}
 	flag.Parse()
@@ -455,6 +457,31 @@ func main() {
 				showTweets(tweets[:], *verbose)
 			}
 		}
+	} else if len(*fromfile) > 0 {
+		var text []byte
+		if *fromfile == "-" {
+			text, err = ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatal("failed to read a new tweet from Stdin:", err)
+			}
+		} else {
+			var fd *os.File
+			fd, err = os.Open(*fromfile)
+			if err != nil {
+				log.Fatal("failed to open:", err)
+			}
+			text, err = ioutil.ReadAll(fd)
+			fd.Close()
+			if err != nil {
+				log.Fatal("failed to read a new tweet from file:", err)
+			}
+		}
+		var tweet Tweet
+		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": *inreply}, &tweet)
+		if err != nil {
+			log.Fatal("failed to post tweet:", err)
+		}
+		fmt.Println("tweeted:", tweet.Identifier)
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
 			var tweet Tweet
