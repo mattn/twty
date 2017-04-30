@@ -335,6 +335,8 @@ var (
 
 	fromfile = flag.String("ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
 	count    = flag.String("count", "", "fetch tweets count")
+	since    = flag.String("since", "", "fetch tweets since date.")
+	until    = flag.String("until", "", "fetch tweets until date.")
 )
 
 func readFile(filename string) ([]byte, error) {
@@ -345,14 +347,48 @@ func readFile(filename string) ([]byte, error) {
 	}
 }
 
-func countToOpt(opt map[string]string, count *string) map[string]string {
-	if count != nil && *count != "" {
-		_, err := strconv.Atoi(*count)
+func countToOpt(opt map[string]string, c *string) map[string]string {
+	if c != nil && *c != "" {
+		_, err := strconv.Atoi(*c)
 		if err == nil {
-			opt["count"] = *count
+			opt["count"] = *c
 		}
 	}
 	return opt
+}
+
+func sinceToOpt(opt map[string]string, timeFormat *string) map[string]string {
+	return timeFormatToOpt(opt, "since", timeFormat)
+}
+
+func untilToOpt(opt map[string]string, timeFormat *string) map[string]string {
+	return timeFormatToOpt(opt, "until", timeFormat)
+}
+
+func timeFormatToOpt(opt map[string]string, key string, timeFormat *string) map[string]string {
+	if timeFormat == nil || *timeFormat != "" || !isTimeFormat(*timeFormat) {
+		return opt
+	}
+	opt[key] = *timeFormat
+
+	return opt
+}
+
+// isTimeFormat returns true if the parameter string matches the format like '[0-9]+-[0-9]+-[0-9]+'
+func isTimeFormat(t string) bool {
+	splitFormat := strings.Split(t, "-")
+	if len(splitFormat) != 3 {
+		return false
+	}
+
+	for _, v := range splitFormat {
+		_, err := strconv.Atoi(v)
+		if err != nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func main() {
@@ -397,7 +433,11 @@ func main() {
 			Statuses       []Tweet `json:"statuses"`
 			SearchMetadata `json:"search_metadata"`
 		}{}
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", countToOpt(map[string]string{"q": *search}, count), &res)
+		opt := map[string]string{"q": *search}
+		opt = countToOpt(map[string]string{"q": *search}, count)
+		opt = sinceToOpt(opt, since)
+		opt = untilToOpt(opt, until)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
 		if err != nil {
 			log.Fatal("failed to get statuses:", err)
 		}
