@@ -6,7 +6,7 @@ A command-line twitter client
 
 1. Install golang environment.
 
-   see: http://golang.org/doc/install.html
+   See: http://golang.org/doc/install.html
 
 2. get twty
 
@@ -34,7 +34,7 @@ Do you use proxy? then set environment variable `HTTP_PROXY` like below.
 
 ## License
 
-under the MIT License: http://mattn.mit-license.org/2015
+under the MIT License: http://mattn.mit-license.org/2017
 
 ## Author
 
