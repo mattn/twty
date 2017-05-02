@@ -6,9 +6,7 @@ A command-line twitter client
 
 1. Install golang environment.
 
- see: http://golang.org/doc/install.html
- for japanese: http://golang.jp/install
- for windows user: http://code.google.com/p/gomingw/downloads/list
+   see: http://golang.org/doc/install.html
 
 2. get twty
 
