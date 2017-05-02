@@ -361,6 +361,8 @@ func main() {
 	}
 	flag.Parse()
 
+	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",http2client=0")
+
 	file, config, err := getConfig()
 	if err != nil {
 		log.Fatal("failed to get configuration:", err)
