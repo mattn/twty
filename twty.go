@@ -473,7 +473,7 @@ func main() {
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*favorite) > 0 {
-		err := rawCall(token, "POST", "https://api.twitter.com/1.1/favorites/create.json", countToOpt(map[string]string{"id": *favorite}, count), nil)
+		err := rawCall(token, "POST", "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": *favorite}, nil)
 		if err != nil {
 			log.Fatal("failed to create favorite:", err)
 		}
@@ -550,7 +550,7 @@ func main() {
 		}
 	} else {
 		var tweet Tweet
-		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", countToOpt(map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, count), &tweet)
+		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, &tweet)
 		if err != nil {
 			log.Fatal("failed to post tweet:", err)
 		}
