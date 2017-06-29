@@ -423,6 +423,11 @@ func main() {
   -r: show replies
   -v: detail display
   -ff FILENAME: post utf-8 string from a file("-" means STDIN)
+  -count NUMBER: show NUMBER tweets at timeline.
+  -since DATE: show tweets created after the DATE (ex. 2017-05-01)
+  -until DATE: show tweets created before the DATE (ex. 2017-05-31)
+  -since_id NUMBER: show tweets that have ids greater than NUMBER.
+  -max_id NUMBER: show tweets that have ids lower than NUMBER.
 `)
 	}
 	flag.Parse()
