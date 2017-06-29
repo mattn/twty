@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -333,6 +334,11 @@ var (
 	debug    = flag.Bool("debug", false, "debug json")
 
 	fromfile = flag.String("ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
+	count    = flag.String("count", "", "fetch tweets count")
+	since    = flag.String("since", "", "fetch tweets since date.")
+	until    = flag.String("until", "", "fetch tweets until date.")
+	sinceID  = flag.Int64("since_id", 0, "fetch tweets that id is greater than since_id.")
+	maxID    = flag.Int64("max_id", 0, "fetch tweets that id is lower than max_id.")
 )
 
 func readFile(filename string) ([]byte, error) {
@@ -341,6 +347,66 @@ func readFile(filename string) ([]byte, error) {
 	} else {
 		return ioutil.ReadFile(filename)
 	}
+}
+
+func countToOpt(opt map[string]string, c *string) map[string]string {
+	if c != nil && *c != "" {
+		_, err := strconv.Atoi(*c)
+		if err == nil {
+			opt["count"] = *c
+		}
+	}
+	return opt
+}
+
+func sinceToOpt(opt map[string]string, timeFormat *string) map[string]string {
+	return timeFormatToOpt(opt, "since", timeFormat)
+}
+
+func untilToOpt(opt map[string]string, timeFormat *string) map[string]string {
+	return timeFormatToOpt(opt, "until", timeFormat)
+}
+
+func timeFormatToOpt(opt map[string]string, key string, timeFormat *string) map[string]string {
+	if timeFormat == nil || *timeFormat != "" || !isTimeFormat(*timeFormat) {
+		return opt
+	}
+	opt[key] = *timeFormat
+
+	return opt
+}
+
+func sinceIDtoOpt(opt map[string]string, id *int64) map[string]string {
+	return idToOpt(opt, "since_id", id)
+}
+
+func maxIDtoOpt(opt map[string]string, id *int64) map[string]string {
+	return idToOpt(opt, "max_id", id)
+}
+
+func idToOpt(opt map[string]string, key string, id *int64) map[string]string {
+	if id == nil || *id < 1 {
+		return opt
+	}
+	opt[key] = strconv.FormatInt(*id, 10)
+	return opt
+}
+
+// isTimeFormat returns true if the parameter string matches the format like '[0-9]+-[0-9]+-[0-9]+'
+func isTimeFormat(t string) bool {
+	splitFormat := strings.Split(t, "-")
+	if len(splitFormat) != 3 {
+		return false
+	}
+
+	for _, v := range splitFormat {
+		_, err := strconv.Atoi(v)
+		if err != nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func main() {
@@ -357,6 +423,11 @@ func main() {
   -r: show replies
   -v: detail display
   -ff FILENAME: post utf-8 string from a file("-" means STDIN)
+  -count NUMBER: show NUMBER tweets at timeline.
+  -since DATE: show tweets created after the DATE (ex. 2017-05-01)
+  -until DATE: show tweets created before the DATE (ex. 2017-05-31)
+  -since_id NUMBER: show tweets that have ids greater than NUMBER.
+  -max_id NUMBER: show tweets that have ids lower than NUMBER.
 `)
 	}
 	flag.Parse()
@@ -387,14 +458,18 @@ func main() {
 			Statuses       []Tweet `json:"statuses"`
 			SearchMetadata `json:"search_metadata"`
 		}{}
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", map[string]string{"q": *search}, &res)
+		opt := map[string]string{"q": *search}
+		opt = countToOpt(map[string]string{"q": *search}, count)
+		opt = sinceToOpt(opt, since)
+		opt = untilToOpt(opt, until)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
 		if err != nil {
 			log.Fatal("failed to get statuses:", err)
 		}
 		showTweets(res.Statuses, *verbose)
 	} else if *reply {
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/mentions_timeline.json", map[string]string{}, &tweets)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
@@ -410,14 +485,22 @@ func main() {
 			part = []string{account.ScreenName, part[0]}
 		}
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", map[string]string{"owner_screen_name": part[0], "slug": part[1]}, &tweets)
+		opt := map[string]string{"owner_screen_name": part[0], "slug": part[1]}
+		opt = countToOpt(opt, count)
+		opt = sinceIDtoOpt(opt, sinceID)
+		opt = maxIDtoOpt(opt, maxID)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*user) > 0 {
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", map[string]string{"screen_name": *user}, &tweets)
+		opt := map[string]string{"screen_name": *user}
+		opt = countToOpt(opt, count)
+		opt = sinceIDtoOpt(opt, sinceID)
+		opt = maxIDtoOpt(opt, maxID)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
@@ -482,7 +565,7 @@ func main() {
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
 			var tweet Tweet
-			err := rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", map[string]string{}, &tweet)
+			err := rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", countToOpt(map[string]string{}, count), &tweet)
 			if err != nil {
 				log.Fatal("failed to retweet:", err)
 			}
@@ -492,7 +575,7 @@ func main() {
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
-			err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/home_timeline.json", map[string]string{}, &tweets)
+			err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 			if err != nil {
 				log.Fatal("failed to get tweets:", err)
 			}
