@@ -337,6 +337,8 @@ var (
 	count    = flag.String("count", "", "fetch tweets count")
 	since    = flag.String("since", "", "fetch tweets since date.")
 	until    = flag.String("until", "", "fetch tweets until date.")
+	sinceID  = flag.Int64("since_id", 0, "fetch tweets that id is greater than since_id.")
+	maxID    = flag.Int64("max_id", 0, "fetch tweets that id is lower than max_id.")
 )
 
 func readFile(filename string) ([]byte, error) {
@@ -371,6 +373,22 @@ func timeFormatToOpt(opt map[string]string, key string, timeFormat *string) map[
 	}
 	opt[key] = *timeFormat
 
+	return opt
+}
+
+func sinceIDtoOpt(opt map[string]string, id *int64) map[string]string {
+	return idToOpt(opt, "since_id", id)
+}
+
+func maxIDtoOpt(opt map[string]string, id *int64) map[string]string {
+	return idToOpt(opt, "max_id", id)
+}
+
+func idToOpt(opt map[string]string, key string, id *int64) map[string]string {
+	if id == nil || *id < 1 {
+		return opt
+	}
+	opt[key] = strconv.FormatInt(*id, 10)
 	return opt
 }
 
@@ -460,14 +478,22 @@ func main() {
 			part = []string{account.ScreenName, part[0]}
 		}
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", countToOpt(map[string]string{"owner_screen_name": part[0], "slug": part[1]}, count), &tweets)
+		opt := map[string]string{"owner_screen_name": part[0], "slug": part[1]}
+		opt = countToOpt(opt, count)
+		opt = sinceIDtoOpt(opt, sinceID)
+		opt = maxIDtoOpt(opt, maxID)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*user) > 0 {
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", countToOpt(map[string]string{"screen_name": *user}, count), &tweets)
+		opt := map[string]string{"screen_name": *user}
+		opt = countToOpt(opt, count)
+		opt = sinceIDtoOpt(opt, sinceID)
+		opt = maxIDtoOpt(opt, maxID)
+		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
