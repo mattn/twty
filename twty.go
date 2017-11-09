@@ -355,6 +355,17 @@ func getConfig(profile string) (string, map[string]string, error) {
 	var file string
 	if profile == "" {
 		file = filepath.Join(dir, "settings.json")
+	} else if profile == "?" {
+		names, err := filepath.Glob(filepath.Join(dir, "settings*.json"))
+		if err != nil {
+			return "", nil, err
+		}
+		for _, name := range names {
+			name = filepath.Base(name)
+			name = strings.TrimLeft(name[8:len(name)-5], "-")
+			fmt.Println(name)
+		}
+		os.Exit(0)
 	} else {
 		file = filepath.Join(dir, "settings-"+profile+".json")
 	}
@@ -489,7 +500,7 @@ func main() {
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage of twty:
-  -a ACCOUNT: switch account to load configuration file. Note: experimental
+  -a PROFILE: switch profile to load configuration file.
   -f ID: specify favorite ID
   -i ID: specify in-reply ID, if not specify text, it will be RT.
   -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
