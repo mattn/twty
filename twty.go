@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"flag"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -130,6 +132,18 @@ type RSS struct {
 	}
 }
 
+type files []string
+
+func (f *files) String() string {
+	return strings.Join([]string(files), ",")
+}
+
+func (f *files) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
+var myFlags arrayFlags
 var oauthClient = oauth.Client{
 	TemporaryCredentialRequestURI: "https://api.twitter.com/oauth/request_token",
 	ResourceOwnerAuthorizationURI: "https://api.twitter.com/oauth/authenticate",
@@ -206,7 +220,50 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	return token, authorized, nil
 }
 
-func rawCall(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
+func upload(token *oauth.Credentials, file string, opt map[string]string, res interface{}) error {
+	uri := "https://upload.twitter.com/1.1/media/upload.json"
+	param := make(url.Values)
+	for k, v := range opt {
+		param.Set(k, v)
+	}
+	oauthClient.SignParam(token, http.MethodPost, uri, param)
+	var buf bytes.Buffer
+
+	w := multipart.NewWriter(&buf)
+
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	fw, err := w.CreateFormFile("media", file)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(fw, f); err != nil {
+		return err
+	}
+	w.Close()
+
+	req, err := http.NewRequest(http.MethodPost, uri, &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if res == nil {
+		return nil
+	}
+	return json.NewDecoder(resp.Body).Decode(&res)
+}
+
+func rawCallJSON(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
 	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
@@ -214,7 +271,7 @@ func rawCall(token *oauth.Credentials, method string, uri string, opt map[string
 	oauthClient.SignParam(token, method, uri, param)
 	var resp *http.Response
 	var err error
-	if method == "GET" {
+	if method == http.MethodGet {
 		uri = uri + "?" + param.Encode()
 		resp, err = http.Get(uri)
 	} else {
@@ -330,6 +387,7 @@ var (
 	search   = flag.String("s", "", "search word")
 	stream   = flag.Bool("S", false, "stream timeline")
 	inreply  = flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
+	media    = flag.String("m", "", "upload media")
 	verbose  = flag.Bool("v", false, "detail display")
 	debug    = flag.Bool("debug", false, "debug json")
 
@@ -416,6 +474,7 @@ func main() {
   -f ID: specify favorite ID
   -i ID: specify in-reply ID, if not specify text, it will be RT.
   -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
+  -m FILE: upload media
   -u USER: show user's timeline
   -s WORD: search timeline
   -json: as JSON
@@ -453,6 +512,27 @@ func main() {
 		}
 	}
 
+	if *media != "" {
+		res := struct {
+			MediaID          int64  `json:"media_id"`
+			MediaIDString    string `json:"media_id_string"`
+			Size             int    `json:"size"`
+			ExpiresAfterSecs int    `json:"expires_after_secs"`
+			Image            struct {
+				ImageType string `json:"image_type"`
+				W         int    `json:"w"`
+				H         int    `json:"h"`
+			} `json:"image"`
+		}{}
+		err = upload(token, "logo.png", nil, &res)
+		if err != nil {
+			log.Fatal("failed to upload media:", err)
+		}
+		fmt.Println(res)
+		//func upload(token *oauth.Credentials, file string, opt map[string]string, res interface{}) error {
+		return
+	}
+
 	if len(*search) > 0 {
 		res := struct {
 			Statuses       []Tweet `json:"statuses"`
@@ -462,14 +542,14 @@ func main() {
 		opt = countToOpt(map[string]string{"q": *search}, count)
 		opt = sinceToOpt(opt, since)
 		opt = untilToOpt(opt, until)
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
+		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
 		if err != nil {
 			log.Fatal("failed to get statuses:", err)
 		}
 		showTweets(res.Statuses, *verbose)
 	} else if *reply {
 		var tweets []Tweet
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
+		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
@@ -478,7 +558,7 @@ func main() {
 		part := strings.SplitN(*list, "/", 2)
 		if len(part) == 1 {
 			var account Account
-			err := rawCall(token, "GET", "https://api.twitter.com/1.1/account/settings.json", nil, &account)
+			err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
 			if err != nil {
 				log.Fatal("failed to get account:", err)
 			}
@@ -489,7 +569,7 @@ func main() {
 		opt = countToOpt(opt, count)
 		opt = sinceIDtoOpt(opt, sinceID)
 		opt = maxIDtoOpt(opt, maxID)
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
+		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
@@ -500,13 +580,13 @@ func main() {
 		opt = countToOpt(opt, count)
 		opt = sinceIDtoOpt(opt, sinceID)
 		opt = maxIDtoOpt(opt, maxID)
-		err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
+		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
 		showTweets(tweets, *verbose)
 	} else if len(*favorite) > 0 {
-		err := rawCall(token, "POST", "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": *favorite}, nil)
+		err := rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": *favorite}, nil)
 		if err != nil {
 			log.Fatal("failed to create favorite:", err)
 		}
@@ -517,7 +597,7 @@ func main() {
 	} else if *stream {
 		uri := "https://userstream.twitter.com/1.1/user.json"
 		param := make(url.Values)
-		oauthClient.SignParam(token, "GET", uri, param)
+		oauthClient.SignParam(token, http.MethodGet, uri, param)
 		uri = uri + "?" + param.Encode()
 		resp, err := http.Get(uri)
 		if err != nil {
@@ -557,7 +637,7 @@ func main() {
 			log.Fatal("failed to read a new tweet:", err)
 		}
 		var tweet Tweet
-		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": *inreply}, &tweet)
+		err = rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": *inreply}, &tweet)
 		if err != nil {
 			log.Fatal("failed to post tweet:", err)
 		}
@@ -565,7 +645,7 @@ func main() {
 	} else if flag.NArg() == 0 {
 		if len(*inreply) > 0 {
 			var tweet Tweet
-			err := rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", countToOpt(map[string]string{}, count), &tweet)
+			err := rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", countToOpt(map[string]string{}, count), &tweet)
 			if err != nil {
 				log.Fatal("failed to retweet:", err)
 			}
@@ -575,7 +655,7 @@ func main() {
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
-			err := rawCall(token, "GET", "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
+			err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 			if err != nil {
 				log.Fatal("failed to get tweets:", err)
 			}
@@ -583,7 +663,7 @@ func main() {
 		}
 	} else {
 		var tweet Tweet
-		err = rawCall(token, "POST", "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, &tweet)
+		err = rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, &tweet)
 		if err != nil {
 			log.Fatal("failed to post tweet:", err)
 		}
