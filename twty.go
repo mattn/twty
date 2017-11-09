@@ -135,7 +135,7 @@ type RSS struct {
 type files []string
 
 func (f *files) String() string {
-	return strings.Join([]string(files), ",")
+	return strings.Join([]string(*f), ",")
 }
 
 func (f *files) Set(value string) error {
@@ -143,7 +143,6 @@ func (f *files) Set(value string) error {
 	return nil
 }
 
-var myFlags arrayFlags
 var oauthClient = oauth.Client{
 	TemporaryCredentialRequestURI: "https://api.twitter.com/oauth/request_token",
 	ResourceOwnerAuthorizationURI: "https://api.twitter.com/oauth/authenticate",
@@ -263,7 +262,7 @@ func upload(token *oauth.Credentials, file string, opt map[string]string, res in
 	return json.NewDecoder(resp.Body).Decode(&res)
 }
 
-func rawCallJSON(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
+func rawCall(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
 	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
@@ -284,7 +283,7 @@ func rawCallJSON(token *oauth.Credentials, method string, uri string, opt map[st
 	if res == nil {
 		return nil
 	}
-	if *debug {
+	if debug {
 		return json.NewDecoder(io.TeeReader(resp.Body, os.Stdout)).Decode(&res)
 	}
 	return json.NewDecoder(resp.Body).Decode(&res)
@@ -306,8 +305,8 @@ func toLocalTime(timeStr string) string {
 	return timeValue.Local().Format(TIME_LAYOUT)
 }
 
-func showTweets(tweets []Tweet, verbose bool) {
-	if *asjson {
+func showTweets(tweets []Tweet, asjson bool, verbose bool) {
+	if asjson {
 		for _, tweet := range tweets {
 			json.NewEncoder(os.Stdout).Encode(tweet)
 			os.Stdout.Sync()
@@ -339,7 +338,7 @@ func showTweets(tweets []Tweet, verbose bool) {
 	}
 }
 
-func getConfig() (string, map[string]string, error) {
+func getConfig(profile string) (string, map[string]string, error) {
 	dir := os.Getenv("HOME")
 	if dir == "" && runtime.GOOS == "windows" {
 		dir = os.Getenv("APPDATA")
@@ -354,10 +353,10 @@ func getConfig() (string, map[string]string, error) {
 		return "", nil, err
 	}
 	var file string
-	if *account == "" {
+	if profile == "" {
 		file = filepath.Join(dir, "settings.json")
 	} else {
-		file = filepath.Join(dir, "settings-"+*account+".json")
+		file = filepath.Join(dir, "settings-"+profile+".json")
 	}
 	config := map[string]string{}
 
@@ -378,25 +377,7 @@ func getConfig() (string, map[string]string, error) {
 }
 
 var (
-	account  = flag.String("a", "", "account")
-	reply    = flag.Bool("r", false, "show replies")
-	list     = flag.String("l", "", "show tweets")
-	asjson   = flag.Bool("json", false, "show tweets as json")
-	user     = flag.String("u", "", "show user timeline")
-	favorite = flag.String("f", "", "specify favorite ID")
-	search   = flag.String("s", "", "search word")
-	stream   = flag.Bool("S", false, "stream timeline")
-	inreply  = flag.String("i", "", "specify in-reply ID, if not specify text, it will be RT.")
-	media    = flag.String("m", "", "upload media")
-	verbose  = flag.Bool("v", false, "detail display")
-	debug    = flag.Bool("debug", false, "debug json")
-
-	fromfile = flag.String("ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
-	count    = flag.String("count", "", "fetch tweets count")
-	since    = flag.String("since", "", "fetch tweets since date.")
-	until    = flag.String("until", "", "fetch tweets until date.")
-	sinceID  = flag.Int64("since_id", 0, "fetch tweets that id is greater than since_id.")
-	maxID    = flag.Int64("max_id", 0, "fetch tweets that id is lower than max_id.")
+	debug bool
 )
 
 func readFile(filename string) ([]byte, error) {
@@ -407,46 +388,45 @@ func readFile(filename string) ([]byte, error) {
 	}
 }
 
-func countToOpt(opt map[string]string, c *string) map[string]string {
-	if c != nil && *c != "" {
-		_, err := strconv.Atoi(*c)
+func countToOpt(opt map[string]string, c string) map[string]string {
+	if c != "" {
+		_, err := strconv.Atoi(c)
 		if err == nil {
-			opt["count"] = *c
+			opt["count"] = c
 		}
 	}
 	return opt
 }
 
-func sinceToOpt(opt map[string]string, timeFormat *string) map[string]string {
+func sinceToOpt(opt map[string]string, timeFormat string) map[string]string {
 	return timeFormatToOpt(opt, "since", timeFormat)
 }
 
-func untilToOpt(opt map[string]string, timeFormat *string) map[string]string {
+func untilToOpt(opt map[string]string, timeFormat string) map[string]string {
 	return timeFormatToOpt(opt, "until", timeFormat)
 }
 
-func timeFormatToOpt(opt map[string]string, key string, timeFormat *string) map[string]string {
-	if timeFormat == nil || *timeFormat != "" || !isTimeFormat(*timeFormat) {
+func timeFormatToOpt(opt map[string]string, key string, timeFormat string) map[string]string {
+	if timeFormat != "" || !isTimeFormat(timeFormat) {
 		return opt
 	}
-	opt[key] = *timeFormat
-
+	opt[key] = timeFormat
 	return opt
 }
 
-func sinceIDtoOpt(opt map[string]string, id *int64) map[string]string {
+func sinceIDtoOpt(opt map[string]string, id int64) map[string]string {
 	return idToOpt(opt, "since_id", id)
 }
 
-func maxIDtoOpt(opt map[string]string, id *int64) map[string]string {
+func maxIDtoOpt(opt map[string]string, id int64) map[string]string {
 	return idToOpt(opt, "max_id", id)
 }
 
-func idToOpt(opt map[string]string, key string, id *int64) map[string]string {
-	if id == nil || *id < 1 {
+func idToOpt(opt map[string]string, key string, id int64) map[string]string {
+	if id < 1 {
 		return opt
 	}
-	opt[key] = strconv.FormatInt(*id, 10)
+	opt[key] = strconv.FormatInt(id, 10)
 	return opt
 }
 
@@ -468,6 +448,45 @@ func isTimeFormat(t string) bool {
 }
 
 func main() {
+	var profile string
+	var reply bool
+	var list string
+	var asjson bool
+	var user string
+	var favorite string
+	var search string
+	var stream bool
+	var inreply string
+	var media files
+	var verbose bool
+
+	flag.StringVar(&profile, "a", "", "account")
+	flag.BoolVar(&reply, "r", false, "show replies")
+	flag.StringVar(&list, "l", "", "show tweets")
+	flag.BoolVar(&asjson, "json", false, "show tweets as json")
+	flag.StringVar(&user, "u", "", "show user timeline")
+	flag.StringVar(&favorite, "f", "", "specify favorite ID")
+	flag.StringVar(&search, "s", "", "search word")
+	flag.BoolVar(&stream, "S", false, "stream timeline")
+	flag.StringVar(&inreply, "i", "", "specify in-reply ID, if not specify text, it will be RT.")
+	flag.Var(&media, "m", "upload media")
+	flag.BoolVar(&verbose, "v", false, "detail display")
+	flag.BoolVar(&debug, "debug", false, "debug json")
+
+	var fromfile string
+	var count string
+	var since string
+	var until string
+	var sinceID int64
+	var maxID int64
+
+	flag.StringVar(&fromfile, "ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
+	flag.StringVar(&count, "count", "", "fetch tweets count")
+	flag.StringVar(&since, "since", "", "fetch tweets since date.")
+	flag.StringVar(&until, "until", "", "fetch tweets until date.")
+	flag.Int64Var(&sinceID, "since_id", 0, "fetch tweets that id is greater than since_id.")
+	flag.Int64Var(&maxID, "max_id", 0, "fetch tweets that id is lower than max_id.")
+
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage of twty:
   -a ACCOUNT: switch account to load configuration file. Note: experimental
@@ -493,7 +512,7 @@ func main() {
 
 	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",http2client=0")
 
-	file, config, err := getConfig()
+	file, config, err := getConfig(profile)
 	if err != nil {
 		log.Fatal("failed to get configuration:", err)
 	}
@@ -512,7 +531,7 @@ func main() {
 		}
 	}
 
-	if *media != "" {
+	if len(media) > 0 {
 		res := struct {
 			MediaID          int64  `json:"media_id"`
 			MediaIDString    string `json:"media_id_string"`
@@ -524,41 +543,41 @@ func main() {
 				H         int    `json:"h"`
 			} `json:"image"`
 		}{}
-		err = upload(token, "logo.png", nil, &res)
-		if err != nil {
-			log.Fatal("failed to upload media:", err)
+		for i := range media {
+			err = upload(token, media[i], nil, &res)
+			if err != nil {
+				log.Fatal("failed to upload media:", err)
+			}
+			media[i] = res.MediaIDString
 		}
-		fmt.Println(res)
-		//func upload(token *oauth.Credentials, file string, opt map[string]string, res interface{}) error {
-		return
 	}
 
-	if len(*search) > 0 {
+	if len(search) > 0 {
 		res := struct {
 			Statuses       []Tweet `json:"statuses"`
 			SearchMetadata `json:"search_metadata"`
 		}{}
-		opt := map[string]string{"q": *search}
-		opt = countToOpt(map[string]string{"q": *search}, count)
+		opt := map[string]string{"q": search}
+		opt = countToOpt(map[string]string{"q": search}, count)
 		opt = sinceToOpt(opt, since)
 		opt = untilToOpt(opt, until)
-		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
+		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
 		if err != nil {
 			log.Fatal("failed to get statuses:", err)
 		}
-		showTweets(res.Statuses, *verbose)
-	} else if *reply {
+		showTweets(res.Statuses, asjson, verbose)
+	} else if reply {
 		var tweets []Tweet
-		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
+		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
-		showTweets(tweets, *verbose)
-	} else if len(*list) > 0 {
-		part := strings.SplitN(*list, "/", 2)
+		showTweets(tweets, asjson, verbose)
+	} else if list != "" {
+		part := strings.SplitN(list, "/", 2)
 		if len(part) == 1 {
 			var account Account
-			err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
+			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
 			if err != nil {
 				log.Fatal("failed to get account:", err)
 			}
@@ -569,24 +588,24 @@ func main() {
 		opt = countToOpt(opt, count)
 		opt = sinceIDtoOpt(opt, sinceID)
 		opt = maxIDtoOpt(opt, maxID)
-		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
+		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
-		showTweets(tweets, *verbose)
-	} else if len(*user) > 0 {
+		showTweets(tweets, asjson, verbose)
+	} else if user != "" {
 		var tweets []Tweet
-		opt := map[string]string{"screen_name": *user}
+		opt := map[string]string{"screen_name": user}
 		opt = countToOpt(opt, count)
 		opt = sinceIDtoOpt(opt, sinceID)
 		opt = maxIDtoOpt(opt, maxID)
-		err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
+		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("failed to get tweets:", err)
 		}
-		showTweets(tweets, *verbose)
-	} else if len(*favorite) > 0 {
-		err := rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": *favorite}, nil)
+		showTweets(tweets, asjson, verbose)
+	} else if favorite != "" {
+		err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": favorite}, nil)
 		if err != nil {
 			log.Fatal("failed to create favorite:", err)
 		}
@@ -594,7 +613,7 @@ func main() {
 		fmt.Print(EMOJI_RED_HEART)
 		color.Set(color.Reset)
 		fmt.Println("favorited")
-	} else if *stream {
+	} else if stream {
 		uri := "https://userstream.twitter.com/1.1/user.json"
 		param := make(url.Values)
 		oauthClient.SignParam(token, http.MethodGet, uri, param)
@@ -628,24 +647,24 @@ func main() {
 			}
 			last = []byte{}
 			if tweets[0].Identifier != "" {
-				showTweets(tweets[:], *verbose)
+				showTweets(tweets[:], asjson, verbose)
 			}
 		}
-	} else if len(*fromfile) > 0 {
-		text, err := readFile(*fromfile)
+	} else if fromfile != "" {
+		text, err := readFile(fromfile)
 		if err != nil {
 			log.Fatal("failed to read a new tweet:", err)
 		}
 		var tweet Tweet
-		err = rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": *inreply}, &tweet)
+		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": inreply, "media_ids": media.String()}, &tweet)
 		if err != nil {
 			log.Fatal("failed to post tweet:", err)
 		}
 		fmt.Println("tweeted:", tweet.Identifier)
 	} else if flag.NArg() == 0 {
-		if len(*inreply) > 0 {
+		if inreply != "" {
 			var tweet Tweet
-			err := rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+*inreply+".json", countToOpt(map[string]string{}, count), &tweet)
+			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", countToOpt(map[string]string{}, count), &tweet)
 			if err != nil {
 				log.Fatal("failed to retweet:", err)
 			}
@@ -655,15 +674,15 @@ func main() {
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
-			err := rawCallJSON(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
+			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 			if err != nil {
 				log.Fatal("failed to get tweets:", err)
 			}
-			showTweets(tweets, *verbose)
+			showTweets(tweets, asjson, verbose)
 		}
 	} else {
 		var tweet Tweet
-		err = rawCallJSON(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": *inreply}, &tweet)
+		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": inreply, "media_ids": media.String()}, &tweet)
 		if err != nil {
 			log.Fatal("failed to post tweet:", err)
 		}
