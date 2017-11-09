@@ -672,7 +672,7 @@ func main() {
 			log.Fatal("failed to post tweet:", err)
 		}
 		fmt.Println("tweeted:", tweet.Identifier)
-	} else if flag.NArg() == 0 {
+	} else if flag.NArg() == 0 && len(media) == 0 {
 		if inreply != "" {
 			var tweet Tweet
 			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", countToOpt(map[string]string{}, count), &tweet)
