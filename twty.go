@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	EMOJI_RED_HEART    = "\u2764"
-	EMOJI_HIGH_VOLTAGE = "\u26A1"
+	_EmojiRedHeart    = "\u2764"
+	_EmojiHighVoltage = "\u26A1"
 )
 
 // Account hold information about account
@@ -295,14 +295,14 @@ var replacer = strings.NewReplacer(
 	"\t", " ",
 )
 
-const TIME_LAYOUT = "Mon Jan 02 15:04:05 -0700 2006"
+const _TimeLayout = "Mon Jan 02 15:04:05 -0700 2006"
 
 func toLocalTime(timeStr string) string {
-	timeValue, err := time.Parse(TIME_LAYOUT, timeStr)
+	timeValue, err := time.Parse(_TimeLayout, timeStr)
 	if err != nil {
 		return timeStr
 	}
-	return timeValue.Local().Format(TIME_LAYOUT)
+	return timeValue.Local().Format(_TimeLayout)
 }
 
 func showTweets(tweets []Tweet, asjson bool, verbose bool) {
@@ -394,9 +394,8 @@ var (
 func readFile(filename string) ([]byte, error) {
 	if filename == "-" {
 		return ioutil.ReadAll(os.Stdin)
-	} else {
-		return ioutil.ReadFile(filename)
 	}
+	return ioutil.ReadFile(filename)
 }
 
 func countToOpt(opt map[string]string, c string) map[string]string {
@@ -621,7 +620,7 @@ func main() {
 			log.Fatal("failed to create favorite:", err)
 		}
 		color.Set(color.FgHiRed)
-		fmt.Print(EMOJI_RED_HEART)
+		fmt.Print(_EmojiRedHeart)
 		color.Set(color.Reset)
 		fmt.Println("favorited")
 	} else if stream {
@@ -680,7 +679,7 @@ func main() {
 				log.Fatal("failed to retweet:", err)
 			}
 			color.Set(color.FgHiYellow)
-			fmt.Print(EMOJI_HIGH_VOLTAGE)
+			fmt.Print(_EmojiHighVoltage)
 			color.Set(color.Reset)
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
