@@ -636,26 +636,22 @@ func main() {
 		if resp.StatusCode != 200 {
 			log.Fatal("failed to get tweets:", err)
 		}
-		var buf *bufio.Reader
+		var scanner *bufio.Scanner
 		if resp.Header.Get("Content-Encoding") == "gzip" {
 			gr, err := gzip.NewReader(resp.Body)
 			if err != nil {
 				log.Fatal("failed to make gzip decoder:", err)
 			}
-			buf = bufio.NewReader(gr)
+			scanner = bufio.NewScanner(gr)
 		} else {
-			buf = bufio.NewReader(resp.Body)
+			scanner = bufio.NewScanner(resp.Body)
 		}
-		var last []byte
-		for {
-			b, _, err := buf.ReadLine()
-			last = append(last, b...)
+		for scanner.Scan() {
 			var tweets [1]Tweet
-			err = json.Unmarshal(last, &tweets[0])
+			err = json.Unmarshal(scanner.Bytes(), &tweets[0])
 			if err != nil {
 				continue
 			}
-			last = []byte{}
 			if tweets[0].Identifier != "" {
 				showTweets(tweets[:], asjson, verbose)
 			}
