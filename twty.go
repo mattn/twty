@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -174,7 +173,7 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 		cmd.Stderr = os.Stderr
 		err = cmd.Start()
 		if err != nil {
-			return nil, fmt.Errorf("failed to start command: %v", err)
+			return nil, fmt.Errorf("cannot start command: %v", err)
 		}
 	}
 
@@ -185,7 +184,7 @@ func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
 	}
 	accessToken, _, err := oauthClient.RequestToken(http.DefaultClient, requestToken, stdin.Text())
 	if err != nil {
-		return nil, fmt.Errorf("failed to request token: %v", err)
+		return nil, fmt.Errorf("cannot request token: %v", err)
 	}
 	return accessToken, nil
 }
@@ -203,12 +202,12 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	} else {
 		requestToken, err := oauthClient.RequestTemporaryCredentials(http.DefaultClient, "", nil)
 		if err != nil {
-			err = fmt.Errorf("failed to request temporary credentials: %v", err)
+			err = fmt.Errorf("cannot request temporary credentials: %v", err)
 			return nil, false, err
 		}
 		token, err = clientAuth(requestToken)
 		if err != nil {
-			err = fmt.Errorf("failed to request temporary credentials: %v", err)
+			err = fmt.Errorf("cannot request temporary credentials: %v", err)
 			return nil, false, err
 		}
 
@@ -465,7 +464,6 @@ func main() {
 	var user string
 	var favorite string
 	var search string
-	var stream bool
 	var inreply string
 	var media files
 	var verbose bool
@@ -477,7 +475,6 @@ func main() {
 	flag.StringVar(&user, "u", "", "show user timeline")
 	flag.StringVar(&favorite, "f", "", "specify favorite ID")
 	flag.StringVar(&search, "s", "", "search word")
-	flag.BoolVar(&stream, "S", false, "stream timeline")
 	flag.StringVar(&inreply, "i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	flag.Var(&media, "m", "upload media")
 	flag.BoolVar(&verbose, "v", false, "detail display")
@@ -507,7 +504,6 @@ func main() {
   -u USER: show user's timeline
   -s WORD: search timeline
   -json: as JSON
-  -S: stream timeline
   -r: show replies
   -v: detail display
   -ff FILENAME: post utf-8 string from a file("-" means STDIN)
@@ -524,20 +520,20 @@ func main() {
 
 	file, config, err := getConfig(profile)
 	if err != nil {
-		log.Fatal("failed to get configuration:", err)
+		log.Fatal("cannot get configuration:", err)
 	}
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
-		log.Fatal("faild to get access token:", err)
+		log.Fatal("cannot get access token:", err)
 	}
 	if authorized {
 		b, err := json.MarshalIndent(config, "", "  ")
 		if err != nil {
-			log.Fatal("failed to store file:", err)
+			log.Fatal("cannot store file:", err)
 		}
 		err = ioutil.WriteFile(file, b, 0700)
 		if err != nil {
-			log.Fatal("failed to store file:", err)
+			log.Fatal("cannot store file:", err)
 		}
 	}
 
@@ -556,7 +552,7 @@ func main() {
 		for i := range media {
 			err = upload(token, media[i], nil, &res)
 			if err != nil {
-				log.Fatal("failed to upload media:", err)
+				log.Fatal("cannot upload media:", err)
 			}
 			media[i] = res.MediaIDString
 		}
@@ -573,14 +569,14 @@ func main() {
 		opt = untilToOpt(opt, until)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
 		if err != nil {
-			log.Fatal("failed to get statuses:", err)
+			log.Fatal("cannot get statuses:", err)
 		}
 		showTweets(res.Statuses, asjson, verbose)
 	} else if reply {
 		var tweets []Tweet
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 		if err != nil {
-			log.Fatal("failed to get tweets:", err)
+			log.Fatal("cannot get tweets:", err)
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if list != "" {
@@ -589,7 +585,7 @@ func main() {
 			var account Account
 			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
 			if err != nil {
-				log.Fatal("failed to get account:", err)
+				log.Fatal("cannot get account:", err)
 			}
 			part = []string{account.ScreenName, part[0]}
 		}
@@ -600,7 +596,7 @@ func main() {
 		opt = maxIDtoOpt(opt, maxID)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
 		if err != nil {
-			log.Fatal("failed to get tweets:", err)
+			log.Fatal("cannot get tweets:", err)
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if user != "" {
@@ -611,60 +607,27 @@ func main() {
 		opt = maxIDtoOpt(opt, maxID)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
 		if err != nil {
-			log.Fatal("failed to get tweets:", err)
+			log.Fatal("cannot get tweets:", err)
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if favorite != "" {
 		err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": favorite}, nil)
 		if err != nil {
-			log.Fatal("failed to create favorite:", err)
+			log.Fatal("cannot create favorite:", err)
 		}
 		color.Set(color.FgHiRed)
 		fmt.Print(_EmojiRedHeart)
 		color.Set(color.Reset)
 		fmt.Println("favorited")
-	} else if stream {
-		uri := "https://userstream.twitter.com/1.1/user.json"
-		param := make(url.Values)
-		oauthClient.SignParam(token, http.MethodGet, uri, param)
-		uri = uri + "?" + param.Encode()
-		resp, err := http.Get(uri)
-		if err != nil {
-			log.Fatal("failed to get tweets:", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			log.Fatal("failed to get tweets:", err)
-		}
-		var scanner *bufio.Scanner
-		if resp.Header.Get("Content-Encoding") == "gzip" {
-			gr, err := gzip.NewReader(resp.Body)
-			if err != nil {
-				log.Fatal("failed to make gzip decoder:", err)
-			}
-			scanner = bufio.NewScanner(gr)
-		} else {
-			scanner = bufio.NewScanner(resp.Body)
-		}
-		for scanner.Scan() {
-			var tweets [1]Tweet
-			err = json.Unmarshal(scanner.Bytes(), &tweets[0])
-			if err != nil {
-				continue
-			}
-			if tweets[0].Identifier != "" {
-				showTweets(tweets[:], asjson, verbose)
-			}
-		}
 	} else if fromfile != "" {
 		text, err := readFile(fromfile)
 		if err != nil {
-			log.Fatal("failed to read a new tweet:", err)
+			log.Fatal("cannot read a new tweet:", err)
 		}
 		var tweet Tweet
 		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": inreply, "media_ids": media.String()}, &tweet)
 		if err != nil {
-			log.Fatal("failed to post tweet:", err)
+			log.Fatal("cannot post tweet:", err)
 		}
 		fmt.Println("tweeted:", tweet.Identifier)
 	} else if flag.NArg() == 0 && len(media) == 0 {
@@ -672,7 +635,7 @@ func main() {
 			var tweet Tweet
 			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", countToOpt(map[string]string{}, count), &tweet)
 			if err != nil {
-				log.Fatal("failed to retweet:", err)
+				log.Fatal("cannot retweet:", err)
 			}
 			color.Set(color.FgHiYellow)
 			fmt.Print(_EmojiHighVoltage)
@@ -682,7 +645,7 @@ func main() {
 			var tweets []Tweet
 			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
 			if err != nil {
-				log.Fatal("failed to get tweets:", err)
+				log.Fatal("cannot get tweets:", err)
 			}
 			showTweets(tweets, asjson, verbose)
 		}
@@ -690,7 +653,7 @@ func main() {
 		var tweet Tweet
 		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": inreply, "media_ids": media.String()}, &tweet)
 		if err != nil {
-			log.Fatal("failed to post tweet:", err)
+			log.Fatal("cannot post tweet:", err)
 		}
 		fmt.Println("tweeted:", tweet.Identifier)
 	}
