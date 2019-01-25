@@ -40,4 +40,4 @@ under the MIT License: http://mattn.mit-license.org/2017
 
 Yasuhiro Matsumoto <mattn.jp@gmail.com>
 
-Have Fan!
+Have Fun!
