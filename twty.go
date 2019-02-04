@@ -72,7 +72,7 @@ type Account struct {
 // Tweet hold information about tweet
 type Tweet struct {
 	Text       string `json:"text"`
-	FullText   string `json:"full_text"`
+	FullText   string `json:"full_text,omitempty"`
 	Identifier string `json:"id_str"`
 	Source     string `json:"source"`
 	CreatedAt  string `json:"created_at"`
@@ -316,6 +316,10 @@ func toLocalTime(timeStr string) string {
 func showTweets(tweets []Tweet, asjson bool, verbose bool) {
 	if asjson {
 		for _, tweet := range tweets {
+			if tweet.FullText != "" {
+				tweet.Text = tweet.FullText
+				tweet.FullText = ""
+			}
 			json.NewEncoder(os.Stdout).Encode(tweet)
 			os.Stdout.Sync()
 		}
@@ -674,7 +678,7 @@ func main() {
 	} else if flag.NArg() == 0 && len(media) == 0 {
 		if inreply != "" {
 			var tweet Tweet
-			opt := makeopt()
+			opt := makeopt("tweet_mode", "extended")
 			opt = countToOpt(opt, count)
 			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", opt, &tweet)
 			if err != nil {
@@ -686,7 +690,7 @@ func main() {
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
-			opt := makeopt()
+			opt := makeopt("tweet_mode", "extended")
 			opt = countToOpt(opt, count)
 			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
 			if err != nil {
