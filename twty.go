@@ -547,20 +547,20 @@ func main() {
 
 	file, config, err := getConfig(profile)
 	if err != nil {
-		log.Fatal("cannot get configuration:", err)
+		log.Fatalf("cannot get configuration: %v", err)
 	}
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
-		log.Fatal("cannot get access token:", err)
+		log.Fatalf("cannot get access token: %v", err)
 	}
 	if authorized {
 		b, err := json.MarshalIndent(config, "", "  ")
 		if err != nil {
-			log.Fatal("cannot store file:", err)
+			log.Fatalf("cannot store file: %v", err)
 		}
 		err = ioutil.WriteFile(file, b, 0700)
 		if err != nil {
-			log.Fatal("cannot store file:", err)
+			log.Fatalf("cannot store file: %v", err)
 		}
 	}
 
@@ -579,7 +579,7 @@ func main() {
 		for i := range media {
 			err = upload(token, media[i], nil, &res)
 			if err != nil {
-				log.Fatal("cannot upload media:", err)
+				log.Fatalf("cannot upload media: %v", err)
 			}
 			media[i] = res.MediaIDString
 		}
@@ -599,7 +599,7 @@ func main() {
 		opt = untilToOpt(opt, until)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
 		if err != nil {
-			log.Fatal("cannot get statuses:", err)
+			log.Fatalf("cannot get statuses: %v", err)
 		}
 		showTweets(res.Statuses, asjson, verbose)
 	} else if reply {
@@ -610,7 +610,7 @@ func main() {
 		opt = countToOpt(opt, count)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", opt, &tweets)
 		if err != nil {
-			log.Fatal("cannot get tweets:", err)
+			log.Fatalf("cannot get tweets: %v", err)
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if list != "" {
@@ -619,7 +619,7 @@ func main() {
 			var account Account
 			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
 			if err != nil {
-				log.Fatal("cannot get account:", err)
+				log.Fatalf("cannot get account: %v", err)
 			}
 			part = []string{account.ScreenName, part[0]}
 		}
@@ -634,7 +634,7 @@ func main() {
 		opt = maxIDtoOpt(opt, maxID)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
 		if err != nil {
-			log.Fatal("cannot get tweets:", err)
+			log.Fatalf("cannot get tweets: %v", err)
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if user != "" {
@@ -648,7 +648,7 @@ func main() {
 		opt = maxIDtoOpt(opt, maxID)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
 		if err != nil {
-			log.Fatal("cannot get tweets:", err)
+			log.Fatalf("cannot get tweets: %v", err)
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if favorite != "" {
@@ -657,7 +657,7 @@ func main() {
 		)
 		err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", opt, nil)
 		if err != nil {
-			log.Fatal("cannot create favorite:", err)
+			log.Fatalf("cannot create favorite: %v", err)
 		}
 		color.Set(color.FgHiRed)
 		fmt.Print(_EmojiRedHeart)
@@ -666,7 +666,7 @@ func main() {
 	} else if fromfile != "" {
 		text, err := readFile(fromfile)
 		if err != nil {
-			log.Fatal("cannot read a new tweet:", err)
+			log.Fatalf("cannot read a new tweet: %v", err)
 		}
 		var tweet Tweet
 		opt := makeopt(
@@ -676,7 +676,7 @@ func main() {
 		)
 		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
 		if err != nil {
-			log.Fatal("cannot post tweet:", err)
+			log.Fatalf("cannot post tweet: %v", err)
 		}
 		fmt.Println("tweeted:", tweet.Identifier)
 	} else if flag.NArg() == 0 && len(media) == 0 {
@@ -686,7 +686,7 @@ func main() {
 			opt = countToOpt(opt, count)
 			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", opt, &tweet)
 			if err != nil {
-				log.Fatal("cannot retweet:", err)
+				log.Fatalf("cannot retweet: %v", err)
 			}
 			color.Set(color.FgHiYellow)
 			fmt.Print(_EmojiHighVoltage)
@@ -698,7 +698,7 @@ func main() {
 			opt = countToOpt(opt, count)
 			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
 			if err != nil {
-				log.Fatal("cannot get tweets:", err)
+				log.Fatalf("cannot get tweets: %v", err)
 			}
 			showTweets(tweets, asjson, verbose)
 		}
@@ -711,7 +711,7 @@ func main() {
 		)
 		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
 		if err != nil {
-			log.Fatal("cannot post tweet:", err)
+			log.Fatalf("cannot post tweet: %v", err)
 		}
 		fmt.Println("tweeted:", tweet.Identifier)
 	}
