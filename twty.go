@@ -72,6 +72,7 @@ type Account struct {
 // Tweet hold information about tweet
 type Tweet struct {
 	Text       string `json:"text"`
+	FullText   string `json:"full_text"`
 	Identifier string `json:"id_str"`
 	Source     string `json:"source"`
 	CreatedAt  string `json:"created_at"`
@@ -146,6 +147,14 @@ var oauthClient = oauth.Client{
 	TemporaryCredentialRequestURI: "https://api.twitter.com/oauth/request_token",
 	ResourceOwnerAuthorizationURI: "https://api.twitter.com/oauth/authenticate",
 	TokenRequestURI:               "https://api.twitter.com/oauth/access_token",
+}
+
+func makeopt(v ...string) map[string]string {
+	opt := map[string]string{}
+	for i := 0; i < len(v); i += 2 {
+		opt[v[i]] = v[i+1]
+	}
+	return opt
 }
 
 func clientAuth(requestToken *oauth.Credentials) (*oauth.Credentials, error) {
@@ -314,7 +323,12 @@ func showTweets(tweets []Tweet, asjson bool, verbose bool) {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			name := tweets[i].User.Name
 			user := tweets[i].User.ScreenName
-			text := tweets[i].Text
+			var text string
+			if tweets[i].FullText != "" {
+				text = tweets[i].FullText
+			} else {
+				text = tweets[i].Text
+			}
 			text = replacer.Replace(text)
 			color.Set(color.FgHiRed)
 			fmt.Println(user + ": " + name)
@@ -327,7 +341,12 @@ func showTweets(tweets []Tweet, asjson bool, verbose bool) {
 	} else {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			user := tweets[i].User.ScreenName
-			text := tweets[i].Text
+			var text string
+			if tweets[i].FullText != "" {
+				text = tweets[i].FullText
+			} else {
+				text = tweets[i].Text
+			}
 			color.Set(color.FgHiRed)
 			fmt.Print(user)
 			color.Set(color.Reset)
@@ -563,8 +582,11 @@ func main() {
 			Statuses       []Tweet `json:"statuses"`
 			SearchMetadata `json:"search_metadata"`
 		}{}
-		opt := map[string]string{"q": search}
-		opt = countToOpt(map[string]string{"q": search}, count)
+		opt := makeopt(
+			"tweet_mode", "extended",
+			"q", search,
+		)
+		opt = countToOpt(opt, count)
 		opt = sinceToOpt(opt, since)
 		opt = untilToOpt(opt, until)
 		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
@@ -574,7 +596,11 @@ func main() {
 		showTweets(res.Statuses, asjson, verbose)
 	} else if reply {
 		var tweets []Tweet
-		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", countToOpt(map[string]string{}, count), &tweets)
+		opt := makeopt(
+			"tweet_mode", "extended",
+		)
+		opt = countToOpt(opt, count)
+		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", opt, &tweets)
 		if err != nil {
 			log.Fatal("cannot get tweets:", err)
 		}
@@ -590,7 +616,11 @@ func main() {
 			part = []string{account.ScreenName, part[0]}
 		}
 		var tweets []Tweet
-		opt := map[string]string{"owner_screen_name": part[0], "slug": part[1]}
+		opt := makeopt(
+			"tweet_mode", "extended",
+			"owner_screen_name", part[0],
+			"slug", part[1],
+		)
 		opt = countToOpt(opt, count)
 		opt = sinceIDtoOpt(opt, sinceID)
 		opt = maxIDtoOpt(opt, maxID)
@@ -601,7 +631,10 @@ func main() {
 		showTweets(tweets, asjson, verbose)
 	} else if user != "" {
 		var tweets []Tweet
-		opt := map[string]string{"screen_name": user}
+		opt := makeopt(
+			"tweet_mode", "extended",
+			"screen_name", user,
+		)
 		opt = countToOpt(opt, count)
 		opt = sinceIDtoOpt(opt, sinceID)
 		opt = maxIDtoOpt(opt, maxID)
@@ -611,7 +644,10 @@ func main() {
 		}
 		showTweets(tweets, asjson, verbose)
 	} else if favorite != "" {
-		err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", map[string]string{"id": favorite}, nil)
+		opt := makeopt(
+			"id", favorite,
+		)
+		err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", opt, nil)
 		if err != nil {
 			log.Fatal("cannot create favorite:", err)
 		}
@@ -625,7 +661,12 @@ func main() {
 			log.Fatal("cannot read a new tweet:", err)
 		}
 		var tweet Tweet
-		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": string(text), "in_reply_to_status_id": inreply, "media_ids": media.String()}, &tweet)
+		opt := makeopt(
+			"status", string(text),
+			"in_reply_to_status_id", inreply,
+			"media_ids", media.String(),
+		)
+		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
 		if err != nil {
 			log.Fatal("cannot post tweet:", err)
 		}
@@ -633,7 +674,9 @@ func main() {
 	} else if flag.NArg() == 0 && len(media) == 0 {
 		if inreply != "" {
 			var tweet Tweet
-			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", countToOpt(map[string]string{}, count), &tweet)
+			opt := makeopt()
+			opt = countToOpt(opt, count)
+			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", opt, &tweet)
 			if err != nil {
 				log.Fatal("cannot retweet:", err)
 			}
@@ -643,7 +686,9 @@ func main() {
 			fmt.Println("retweeted:", tweet.Identifier)
 		} else {
 			var tweets []Tweet
-			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", countToOpt(map[string]string{}, count), &tweets)
+			opt := makeopt()
+			opt = countToOpt(opt, count)
+			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
 			if err != nil {
 				log.Fatal("cannot get tweets:", err)
 			}
@@ -651,7 +696,12 @@ func main() {
 		}
 	} else {
 		var tweet Tweet
-		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", map[string]string{"status": strings.Join(flag.Args(), " "), "in_reply_to_status_id": inreply, "media_ids": media.String()}, &tweet)
+		opt := makeopt(
+			"status", strings.Join(flag.Args(), " "),
+			"in_reply_to_status_id", inreply,
+			"media_ids", media.String(),
+		)
+		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
 		if err != nil {
 			log.Fatal("cannot post tweet:", err)
 		}
