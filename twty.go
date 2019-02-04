@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html"
@@ -288,6 +289,9 @@ func rawCall(token *oauth.Credentials, method string, uri string, opt map[string
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return errors.New(resp.Status)
+	}
 	if res == nil {
 		return nil
 	}
