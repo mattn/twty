@@ -83,6 +83,9 @@ type Tweet struct {
 		FollowersCount  int    `json:"followers_count"`
 		ProfileImageURL string `json:"profile_image_url"`
 	} `json:"user"`
+	RetweetedStatus *struct {
+		FullText string `json:"full_text"`
+	} `json:"retweeted_status"`
 	Place *struct {
 		ID       string `json:"id"`
 		FullName string `json:"full_name"`
@@ -320,7 +323,9 @@ func toLocalTime(timeStr string) string {
 func showTweets(tweets []Tweet, asjson bool, verbose bool) {
 	if asjson {
 		for _, tweet := range tweets {
-			if tweet.FullText != "" {
+			if tweet.RetweetedStatus != nil {
+				tweet.Text = tweet.RetweetedStatus.FullText
+			} else if tweet.FullText != "" {
 				tweet.Text = tweet.FullText
 				tweet.FullText = ""
 			}
@@ -332,7 +337,9 @@ func showTweets(tweets []Tweet, asjson bool, verbose bool) {
 			name := tweets[i].User.Name
 			user := tweets[i].User.ScreenName
 			var text string
-			if tweets[i].FullText != "" {
+			if tweets[i].RetweetedStatus != nil {
+				tweets[i].Text = tweets[i].RetweetedStatus.FullText
+			} else if tweets[i].FullText != "" {
 				text = tweets[i].FullText
 			} else {
 				text = tweets[i].Text
@@ -350,7 +357,9 @@ func showTweets(tweets []Tweet, asjson bool, verbose bool) {
 		for i := len(tweets) - 1; i >= 0; i-- {
 			user := tweets[i].User.ScreenName
 			var text string
-			if tweets[i].FullText != "" {
+			if tweets[i].RetweetedStatus != nil {
+				text = tweets[i].RetweetedStatus.FullText
+			} else if tweets[i].FullText != "" {
 				text = tweets[i].FullText
 			} else {
 				text = tweets[i].Text
