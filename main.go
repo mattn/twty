@@ -492,6 +492,7 @@ func main() {
 	var favorite string
 	var search string
 	var inreply string
+	var delay time.Duration
 	var media files
 	var verbose bool
 
@@ -504,6 +505,7 @@ func main() {
 	flag.StringVar(&search, "s", "", "search word")
 	flag.StringVar(&inreply, "i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	flag.Var(&media, "m", "upload media")
+	flag.DurationVar(&delay, "S", 0, "delay")
 	flag.BoolVar(&verbose, "v", false, "detail display")
 	flag.BoolVar(&debug, "debug", false, "debug json")
 
@@ -530,6 +532,7 @@ func main() {
   -m FILE: upload media
   -u USER: show user's timeline
   -s WORD: search timeline
+  -S DELAY tweets after DELAY
   -json: as JSON
   -r: show replies
   -v: detail display
@@ -692,6 +695,21 @@ func main() {
 			fmt.Print(_EmojiHighVoltage)
 			color.Set(color.Reset)
 			fmt.Println("retweeted:", tweet.Identifier)
+		} else if delay > 0 {
+			var tweets []Tweet
+			opt := makeopt()
+			for {
+				opt = sinceToOpt(opt, since)
+				err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
+				if err != nil {
+					log.Fatalf("cannot get tweets: %v", err)
+				}
+				if len(tweets) > 0 {
+					showTweets(tweets, asjson, verbose)
+					since = tweets[len(tweets)-1].CreatedAt
+				}
+				time.Sleep(delay)
+			}
 		} else {
 			var tweets []Tweet
 			opt := makeopt("tweet_mode", "extended")
