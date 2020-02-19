@@ -26,6 +26,12 @@ import (
 	"github.com/garyburd/go-oauth/oauth"
 )
 
+const name = "twty"
+
+const version = "0.0.4"
+
+var revision = "HEAD"
+
 const (
 	_EmojiRedHeart    = "\u2764"
 	_EmojiHighVoltage = "\u26A1"
@@ -504,6 +510,7 @@ func main() {
 	var delay time.Duration
 	var media files
 	var verbose bool
+	var showVersion bool
 
 	flag.StringVar(&profile, "a", "", "account")
 	flag.BoolVar(&reply, "r", false, "show replies")
@@ -517,6 +524,7 @@ func main() {
 	flag.DurationVar(&delay, "S", 0, "delay")
 	flag.BoolVar(&verbose, "v", false, "detail display")
 	flag.BoolVar(&debug, "debug", false, "debug json")
+	flag.BoolVar(&showVersion, "v", false, "Print the version")
 
 	var fromfile string
 	var count string
@@ -555,6 +563,10 @@ func main() {
 	}
 	flag.Parse()
 
+	if showVersion {
+		fmt.Printf("%s %s (rev: %s/%s)\n", name, version, revision, runtime.Version())
+		return
+	}
 	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",http2client=0")
 
 	file, config, err := getConfig(profile)
