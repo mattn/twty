@@ -524,7 +524,7 @@ func main() {
 	flag.DurationVar(&delay, "S", 0, "delay")
 	flag.BoolVar(&verbose, "v", false, "detail display")
 	flag.BoolVar(&debug, "debug", false, "debug json")
-	flag.BoolVar(&showVersion, "v", false, "Print the version")
+	flag.BoolVar(&showVersion, "V", false, "Print the version")
 
 	var fromfile string
 	var count string
