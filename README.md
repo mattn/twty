@@ -24,7 +24,7 @@ shown on twitter.com.  Please copy it and type in console like following.
     PIN: XXXXXX
 
 Configuration file is stored in: ~/.config/twty/settings.json
-For windows user: %USERPROFILE%/Application Data/twty/settings.json
+For windows user: %APPDATA%/twty/settings.json
 
 ## FAQ
 
