@@ -28,7 +28,7 @@ import (
 
 const name = "twty"
 
-const version = "0.0.7"
+const version = "0.0.8"
 
 var revision = "HEAD"
 
@@ -354,7 +354,6 @@ func upload(token *oauth.Credentials, file string, opt map[string]string) (strin
 		}
 
 		oauthClient.SignParam(token, http.MethodPost, uri, param)
-		println("OAuth " + strings.Replace(param.Encode(), "&", ",", -1))
 
 		req.Header.Set("Content-Type", w.FormDataContentType())
 		req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
