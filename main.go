@@ -237,47 +237,176 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	return token, authorized, nil
 }
 
-func upload(token *oauth.Credentials, file string, opt map[string]string, res interface{}) error {
+func upload(token *oauth.Credentials, file string, opt map[string]string) (string, error) {
+	ext := filepath.Ext(strings.ToLower(file))
+	mediaType := ""
+	switch ext {
+	case ".jpg", ".jpeg":
+		mediaType = "image/jpeg"
+	case ".png":
+		mediaType = "image/png"
+	case ".mp4":
+		mediaType = "video/mp4"
+	case ".gif":
+		mediaType = "image/gif"
+	default:
+		return "", errors.New("unrecognized media type")
+	}
+	ft, err := os.Stat(file)
+	if err != nil {
+		return "", err
+	}
+	size := ft.Size()
+
 	uri := "https://upload.twitter.com/1.1/media/upload.json"
 	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
 	}
+	param.Set("command", "INIT")
+	param.Set("total_bytes", fmt.Sprint(size))
+	param.Set("media_type", mediaType)
+
+	req, err := http.NewRequest(http.MethodPost, uri, strings.NewReader(param.Encode()))
+	if err != nil {
+		return "", err
+	}
+
 	oauthClient.SignParam(token, http.MethodPost, uri, param)
-	var buf bytes.Buffer
 
-	w := multipart.NewWriter(&buf)
-
-	f, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	fw, err := w.CreateFormFile("media", file)
-	if err != nil {
-		return err
-	}
-	if _, err = io.Copy(fw, f); err != nil {
-		return err
-	}
-	w.Close()
-
-	req, err := http.NewRequest(http.MethodPost, uri, &buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
+	}
+
+	initRes := struct {
+		ExpiresAfterSecs int64 `json:"expires_after_secs"`
+		Image            struct {
+			H         int64  `json:"h"`
+			ImageType string `json:"image_type"`
+			W         int64  `json:"w"`
+		} `json:"image"`
+		MediaID       int64  `json:"media_id"`
+		MediaIDString string `json:"media_id_string"`
+		Size          int64  `json:"size"`
+	}{}
+	err = json.NewDecoder(resp.Body).Decode(&initRes)
+	resp.Body.Close()
+	if err != nil {
+		return "", err
+	}
+
+	f, err := os.Open(file)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	index := 0
+	for size > 0 {
+		var payload [1024 * 5000]byte
+		n, err := f.Read(payload[:])
+		if err != nil {
+			return "", err
+		}
+
+		var buf bytes.Buffer
+		var ww io.Writer
+
+		w := multipart.NewWriter(&buf)
+
+		ww, err = w.CreateFormField("command")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprint(ww, "APPEND")
+
+		ww, err = w.CreateFormField("media_id")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprint(ww, initRes.MediaIDString)
+
+		ww, err = w.CreateFormField("media")
+		if err != nil {
+			return "", err
+		}
+		ww.Write(payload[:n])
+
+		ww, err = w.CreateFormField("segment_index")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprint(ww, fmt.Sprint(index))
+
+		w.Close()
+
+		param = make(url.Values)
+		for k, v := range opt {
+			param.Set(k, v)
+		}
+		req, err := http.NewRequest(http.MethodPost, uri, &buf)
+		if err != nil {
+			return "", err
+		}
+
+		oauthClient.SignParam(token, http.MethodPost, uri, param)
+		println("OAuth " + strings.Replace(param.Encode(), "&", ",", -1))
+
+		req.Header.Set("Content-Type", w.FormDataContentType())
+		req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
+
+		_, err = http.DefaultClient.Do(req)
+		if err != nil {
+			return "", err
+		}
+		resp.Body.Close()
+		index++
+		size -= int64(n)
+	}
+
+	param = make(url.Values)
+	for k, v := range opt {
+		param.Set(k, v)
+	}
+	param.Set("command", "FINALIZE")
+	param.Set("media_id", initRes.MediaIDString)
+
+	req, err = http.NewRequest(http.MethodPost, uri, strings.NewReader(param.Encode()))
+	if err != nil {
+		return "", err
+	}
+
+	oauthClient.SignParam(token, http.MethodPost, uri, param)
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
-	if res == nil {
-		return nil
+
+	finalizeRes := struct {
+		ExpiresAfterSecs int64  `json:"expires_after_secs"`
+		MediaID          int64  `json:"media_id"`
+		MediaIDString    string `json:"media_id_string"`
+		Size             int64  `json:"size"`
+		Video            struct {
+			VideoType string `json:"video_type"`
+		} `json:"video"`
+	}{}
+
+	err = json.NewDecoder(resp.Body).Decode(&finalizeRes)
+	resp.Body.Close()
+	if err != nil {
+		return "", err
 	}
-	return json.NewDecoder(resp.Body).Decode(&res)
+	return finalizeRes.MediaIDString, nil
 }
 
 func rawCall(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
@@ -498,6 +627,14 @@ func isTimeFormat(t string) bool {
 	return true
 }
 
+func mediaTypeImage(s string) bool {
+	ext := filepath.Ext(strings.ToLower(s))
+	if ext == ".jpg" || ext == ".png" {
+		return true
+	}
+	return false
+}
+
 func main() {
 	var profile string
 	var reply bool
@@ -589,23 +726,11 @@ func main() {
 	}
 
 	if len(media) > 0 {
-		res := struct {
-			MediaID          int64  `json:"media_id"`
-			MediaIDString    string `json:"media_id_string"`
-			Size             int    `json:"size"`
-			ExpiresAfterSecs int    `json:"expires_after_secs"`
-			Image            struct {
-				ImageType string `json:"image_type"`
-				W         int    `json:"w"`
-				H         int    `json:"h"`
-			} `json:"image"`
-		}{}
 		for i := range media {
-			err = upload(token, media[i], nil, &res)
+			media[i], err = upload(token, media[i], nil)
 			if err != nil {
 				log.Fatalf("cannot upload media: %v", err)
 			}
-			media[i] = res.MediaIDString
 		}
 	}
 
