@@ -237,20 +237,37 @@ func getAccessToken(config map[string]string) (*oauth.Credentials, bool, error) 
 	return token, authorized, nil
 }
 
+func contentTypeOf(file string) (string, error) {
+	buf := make([]byte, 512)
+	f, err := os.Open(file)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	n, err := f.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	ct := http.DetectContentType(buf[:n])
+	return ct, nil
+}
+
 func upload(token *oauth.Credentials, file string, opt map[string]string) (string, error) {
-	ext := filepath.Ext(strings.ToLower(file))
-	mediaType := ""
-	switch ext {
-	case ".jpg", ".jpeg":
-		mediaType = "image/jpeg"
-	case ".png":
-		mediaType = "image/png"
-	case ".mp4":
-		mediaType = "video/mp4"
-	case ".gif":
-		mediaType = "image/gif"
-	default:
-		return "", errors.New("unrecognized media type")
+	mediaType, _ := contentTypeOf(file)
+	if mediaType == "" {
+		ext := filepath.Ext(strings.ToLower(file))
+		switch ext {
+		case ".jpg", ".jpeg":
+			mediaType = "image/jpeg"
+		case ".png":
+			mediaType = "image/png"
+		case ".mp4":
+			mediaType = "video/mp4"
+		case ".gif":
+			mediaType = "image/gif"
+		default:
+			return "", errors.New("unrecognized media type")
+		}
 	}
 	ft, err := os.Stat(file)
 	if err != nil {
@@ -624,14 +641,6 @@ func isTimeFormat(t string) bool {
 	}
 
 	return true
-}
-
-func mediaTypeImage(s string) bool {
-	ext := filepath.Ext(strings.ToLower(s))
-	if ext == ".jpg" || ext == ".png" {
-		return true
-	}
-	return false
 }
 
 func main() {
