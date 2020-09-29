@@ -657,7 +657,7 @@ func main() {
 	var verbose bool
 	var showVersion bool
 
-	flag.StringVar(&profile, "a", "", "account")
+	flag.StringVar(&profile, "a", os.Getenv("TWTY_ACCOUNT"), "account")
 	flag.BoolVar(&reply, "r", false, "show replies")
 	flag.StringVar(&list, "l", "", "show tweets")
 	flag.BoolVar(&asjson, "json", false, "show tweets as json")
