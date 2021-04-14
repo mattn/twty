@@ -754,11 +754,17 @@ func main() {
 		opt = countToOpt(opt, count)
 		opt = sinceToOpt(opt, since)
 		opt = untilToOpt(opt, until)
-		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
-		if err != nil {
-			log.Fatalf("cannot get statuses: %v", err)
+		for {
+			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
+			if err != nil {
+				log.Fatalf("cannot get statuses: %v", err)
+			}
+			if len(res.Statuses) > 0 {
+				showTweets(res.Statuses, asjson, verbose)
+				since = res.Statuses[len(res.Statuses)-1].CreatedAt
+			}
+			time.Sleep(delay)
 		}
-		showTweets(res.Statuses, asjson, verbose)
 	} else if reply {
 		var tweets []Tweet
 		opt := makeopt(
