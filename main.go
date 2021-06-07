@@ -763,6 +763,9 @@ func main() {
 				showTweets(res.Statuses, asjson, verbose)
 				since = res.Statuses[len(res.Statuses)-1].CreatedAt
 			}
+			if delay == 0 {
+				break
+			}
 			time.Sleep(delay)
 		}
 	} else if reply {
