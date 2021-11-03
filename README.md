@@ -14,6 +14,11 @@ A command-line twitter client
 
 Thanks all!
 
+## Install for Homebrew users (macOS)
+
+    % brew install twty
+
+
 ## Usage
 
     $ twty -h
