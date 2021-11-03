@@ -18,6 +18,7 @@ Thanks all!
 
     % brew install twty
 
+You would not need to install the golang compiler with this method.
 
 ## Usage
 
