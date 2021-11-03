@@ -14,6 +14,12 @@ A command-line twitter client
 
 Thanks all!
 
+## Install for Homebrew users (macOS)
+
+    % brew install twty
+
+You would not need to install the golang compiler with this method.
+
 ## Usage
 
     $ twty -h
