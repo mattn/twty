@@ -10,7 +10,7 @@ A command-line twitter client
 
 2. get twty
 
-        $ go get github.com/mattn/twty
+        $ go install github.com/mattn/twty@latest
 
 Thanks all!
 
