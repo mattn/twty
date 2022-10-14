@@ -870,6 +870,26 @@ func (flags *Flags) authorization() {
 
 }
 
+const usage = `Usage of twty:
+  -a PROFILE: switch profile to load configuration file.
+  -f ID: specify favorite ID
+  -i ID: specify in-reply ID, if not specify text, it will be RT.
+  -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
+  -m FILE: upload media
+  -u USER: show user's timeline
+  -s WORD: search timeline
+  -S DELAY tweets after DELAY
+  -json: as JSON
+  -r: show replies
+  -v: detail display
+  -ff FILENAME: post utf-8 string from a file("-" means STDIN)
+  -count NUMBER: show NUMBER tweets at timeline.
+  -since DATE: show tweets created after the DATE (ex. 2017-05-01)
+  -until DATE: show tweets created before the DATE (ex. 2017-05-31)
+  -since_id NUMBER: show tweets that have ids greater than NUMBER.
+  -max_id NUMBER: show tweets that have ids lower than NUMBER.
+`
+
 func main() {
 	var flags Flags
 
@@ -895,25 +915,7 @@ func main() {
 	flag.Int64Var(&flags.maxID, "max_id", 0, "fetch tweets that id is lower than max_id.")
 
 	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, `Usage of twty:
-  -a PROFILE: switch profile to load configuration file.
-  -f ID: specify favorite ID
-  -i ID: specify in-reply ID, if not specify text, it will be RT.
-  -l USER/LIST: show list's timeline (ex: mattn_jp/subtech)
-  -m FILE: upload media
-  -u USER: show user's timeline
-  -s WORD: search timeline
-  -S DELAY tweets after DELAY
-  -json: as JSON
-  -r: show replies
-  -v: detail display
-  -ff FILENAME: post utf-8 string from a file("-" means STDIN)
-  -count NUMBER: show NUMBER tweets at timeline.
-  -since DATE: show tweets created after the DATE (ex. 2017-05-01)
-  -until DATE: show tweets created before the DATE (ex. 2017-05-31)
-  -since_id NUMBER: show tweets that have ids greater than NUMBER.
-  -max_id NUMBER: show tweets that have ids lower than NUMBER.
-`)
+		fmt.Fprint(os.Stderr, usage)
 	}
 	flag.Parse()
 
