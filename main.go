@@ -425,7 +425,7 @@ func upload(token *oauth.Credentials, file string, opt map[string]string) (strin
 	return finalizeRes.MediaIDString, nil
 }
 
-func rawCall(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
+func (flags *Flags) rawCall(token *oauth.Credentials, method string, uri string, opt map[string]string, res interface{}) error {
 	param := make(url.Values)
 	for k, v := range opt {
 		param.Set(k, v)
@@ -449,7 +449,7 @@ func rawCall(token *oauth.Credentials, method string, uri string, opt map[string
 	if res == nil {
 		return nil
 	}
-	if debug {
+	if flags.debug {
 		return json.NewDecoder(io.TeeReader(resp.Body, os.Stdout)).Decode(&res)
 	}
 	return json.NewDecoder(resp.Body).Decode(&res)
@@ -573,9 +573,203 @@ func getConfig(profile string) (string, map[string]string, error) {
 	return file, config, nil
 }
 
-var (
-	debug bool
-)
+func (flags *Flags) searchTweets() {
+	res := struct {
+		Statuses       []Tweet `json:"statuses"`
+		SearchMetadata `json:"search_metadata"`
+	}{}
+	opt := makeopt(
+		"tweet_mode", "extended",
+		"q", flags.search,
+	)
+	opt = countToOpt(opt, flags.count)
+	opt = untilToOpt(opt, flags.until)
+	for {
+		opt = sinceToOpt(opt, flags.since)
+		err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
+		if err != nil {
+			log.Fatalf("cannot get statuses: %v", err)
+		}
+		if len(res.Statuses) > 0 {
+			showTweets(res.Statuses, flags.asjson, flags.verbose)
+			flags.since = res.Statuses[len(res.Statuses)-1].CreatedAt
+			opt = sinceToOpt(opt, flags.since)
+		}
+		if flags.delay == 0 {
+			break
+		}
+		time.Sleep(flags.delay)
+	}
+}
+
+func (flags *Flags) showReplies() {
+	var tweets []Tweet
+	opt := makeopt(
+		"tweet_mode", "extended",
+	)
+	opt = countToOpt(opt, flags.count)
+	err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", opt, &tweets)
+	if err != nil {
+		log.Fatalf("cannot get tweets: %v", err)
+	}
+	showTweets(tweets, flags.asjson, flags.verbose)
+}
+
+func (flags *Flags) showListTweets() {
+	part := strings.SplitN(flags.list, "/", 2)
+	if len(part) == 1 {
+		var account Account
+		err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
+		if err != nil {
+			log.Fatalf("cannot get account: %v", err)
+		}
+		part = []string{account.ScreenName, part[0]}
+	}
+	var tweets []Tweet
+	opt := makeopt(
+		"tweet_mode", "extended",
+		"owner_screen_name", part[0],
+		"slug", part[1],
+	)
+	opt = countToOpt(opt, flags.count)
+	opt = sinceIDtoOpt(opt, flags.sinceID)
+	opt = maxIDtoOpt(opt, flags.maxID)
+	err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
+	if err != nil {
+		log.Fatalf("cannot get tweets: %v", err)
+	}
+	showTweets(tweets, flags.asjson, flags.verbose)
+}
+
+func (flags *Flags) showUserTweets() {
+	var tweets []Tweet
+	opt := makeopt(
+		"tweet_mode", "extended",
+		"screen_name", flags.user,
+	)
+	opt = countToOpt(opt, flags.count)
+	opt = sinceIDtoOpt(opt, flags.sinceID)
+	opt = maxIDtoOpt(opt, flags.maxID)
+	err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
+	if err != nil {
+		log.Fatalf("cannot get tweets: %v", err)
+	}
+	showTweets(tweets, flags.asjson, flags.verbose)
+}
+
+func (flags *Flags) favoriteTweet() {
+	opt := makeopt(
+		"id", flags.favorite,
+	)
+	err := flags.rawCall(flags.token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", opt, nil)
+	if err != nil {
+		log.Fatalf("cannot create favorite: %v", err)
+	}
+	color.Set(color.FgHiRed)
+	fmt.Print(_EmojiRedHeart)
+	color.Set(color.Reset)
+	fmt.Println("favorited")
+}
+
+func (flags *Flags) fromFile() {
+	text, err := readFile(flags.fromfile)
+	if err != nil {
+		log.Fatalf("cannot read a new tweet: %v", err)
+	}
+	var tweet Tweet
+	opt := makeopt(
+		"status", string(text),
+		"in_reply_to_status_id", flags.inreply,
+		"media_ids", flags.media.String(),
+	)
+	err = flags.rawCall(flags.token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
+	if err != nil {
+		log.Fatalf("cannot post tweet: %v", err)
+	}
+	fmt.Println("tweeted:", tweet.Identifier)
+}
+
+func (flags *Flags) doRetweet() {
+	var tweet Tweet
+	opt := makeopt("tweet_mode", "extended")
+	opt = countToOpt(opt, flags.count)
+	err := flags.rawCall(flags.token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+flags.inreply+".json", opt, &tweet)
+	if err != nil {
+		log.Fatalf("cannot retweet: %v", err)
+	}
+	color.Set(color.FgHiYellow)
+	fmt.Print(_EmojiHighVoltage)
+	color.Set(color.Reset)
+	fmt.Println("retweeted:", tweet.Identifier)
+}
+
+func (flags *Flags) doStream() {
+	var tweets []Tweet
+	opt := makeopt()
+	for {
+		opt = sinceToOpt(opt, flags.since)
+		err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
+		if err != nil {
+			log.Fatalf("cannot get tweets: %v", err)
+		}
+		if len(tweets) > 0 {
+			showTweets(tweets, flags.asjson, flags.verbose)
+			flags.since = tweets[len(tweets)-1].CreatedAt
+		}
+		time.Sleep(flags.delay)
+	}
+}
+
+func (flags *Flags) doShow() {
+	var tweets []Tweet
+	opt := makeopt("tweet_mode", "extended")
+	opt = countToOpt(opt, flags.count)
+	err := flags.rawCall(flags.token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
+	if err != nil {
+		log.Fatalf("cannot get tweets: %v", err)
+	}
+	showTweets(tweets, flags.asjson, flags.verbose)
+}
+
+func (flags *Flags) doTweet() {
+	var tweet Tweet
+	opt := makeopt(
+		"status", strings.Join(flag.Args(), " "),
+		"in_reply_to_status_id", flags.inreply,
+		"media_ids", flags.media.String(),
+	)
+	err := flags.rawCall(flags.token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
+	if err != nil {
+		log.Fatalf("cannot post tweet: %v", err)
+	}
+	fmt.Println("tweeted:", tweet.Identifier)
+}
+
+type Flags struct {
+	profile  string
+	reply    bool
+	list     string
+	asjson   bool
+	user     string
+	favorite string
+	search   string
+	inreply  string
+	delay    time.Duration
+	media    files
+
+	fromfile string
+	count    string
+	since    string
+	until    string
+	sinceID  int64
+	maxID    int64
+
+	token *oauth.Credentials
+
+	verbose     bool
+	showVersion bool
+	debug       bool
+}
 
 func readFile(filename string) ([]byte, error) {
 	if filename == "-" {
@@ -644,46 +838,28 @@ func isTimeFormat(t string) bool {
 }
 
 func main() {
-	var profile string
-	var reply bool
-	var list string
-	var asjson bool
-	var user string
-	var favorite string
-	var search string
-	var inreply string
-	var delay time.Duration
-	var media files
-	var verbose bool
-	var showVersion bool
+	var flags Flags
 
-	flag.StringVar(&profile, "a", os.Getenv("TWTY_ACCOUNT"), "account")
-	flag.BoolVar(&reply, "r", false, "show replies")
-	flag.StringVar(&list, "l", "", "show tweets")
-	flag.BoolVar(&asjson, "json", false, "show tweets as json")
-	flag.StringVar(&user, "u", "", "show user timeline")
-	flag.StringVar(&favorite, "f", "", "specify favorite ID")
-	flag.StringVar(&search, "s", "", "search word")
-	flag.StringVar(&inreply, "i", "", "specify in-reply ID, if not specify text, it will be RT.")
-	flag.Var(&media, "m", "upload media")
-	flag.DurationVar(&delay, "S", 0, "delay")
-	flag.BoolVar(&verbose, "v", false, "detail display")
-	flag.BoolVar(&debug, "debug", false, "debug json")
-	flag.BoolVar(&showVersion, "V", false, "Print the version")
+	flag.StringVar(&flags.profile, "a", os.Getenv("TWTY_ACCOUNT"), "account")
+	flag.BoolVar(&flags.reply, "r", false, "show replies")
+	flag.StringVar(&flags.list, "l", "", "show tweets")
+	flag.BoolVar(&flags.asjson, "json", false, "show tweets as json")
+	flag.StringVar(&flags.user, "u", "", "show user timeline")
+	flag.StringVar(&flags.favorite, "f", "", "specify favorite ID")
+	flag.StringVar(&flags.search, "s", "", "search word")
+	flag.StringVar(&flags.inreply, "i", "", "specify in-reply ID, if not specify text, it will be RT.")
+	flag.Var(&flags.media, "m", "upload media")
+	flag.DurationVar(&flags.delay, "S", 0, "delay")
+	flag.BoolVar(&flags.verbose, "v", false, "detail display")
+	flag.BoolVar(&flags.debug, "debug", false, "debug json")
+	flag.BoolVar(&flags.showVersion, "V", false, "Print the version")
 
-	var fromfile string
-	var count string
-	var since string
-	var until string
-	var sinceID int64
-	var maxID int64
-
-	flag.StringVar(&fromfile, "ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
-	flag.StringVar(&count, "count", "", "fetch tweets count")
-	flag.StringVar(&since, "since", "", "fetch tweets since date.")
-	flag.StringVar(&until, "until", "", "fetch tweets until date.")
-	flag.Int64Var(&sinceID, "since_id", 0, "fetch tweets that id is greater than since_id.")
-	flag.Int64Var(&maxID, "max_id", 0, "fetch tweets that id is lower than max_id.")
+	flag.StringVar(&flags.fromfile, "ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
+	flag.StringVar(&flags.count, "count", "", "fetch tweets count")
+	flag.StringVar(&flags.since, "since", "", "fetch tweets since date.")
+	flag.StringVar(&flags.until, "until", "", "fetch tweets until date.")
+	flag.Int64Var(&flags.sinceID, "since_id", 0, "fetch tweets that id is greater than since_id.")
+	flag.Int64Var(&flags.maxID, "max_id", 0, "fetch tweets that id is lower than max_id.")
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage of twty:
@@ -708,17 +884,18 @@ func main() {
 	}
 	flag.Parse()
 
-	if showVersion {
+	if flags.showVersion {
 		fmt.Printf("%s %s (rev: %s/%s)\n", name, version, revision, runtime.Version())
 		return
 	}
 	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",http2client=0")
 
-	file, config, err := getConfig(profile)
+	file, config, err := getConfig(flags.profile)
 	if err != nil {
 		log.Fatalf("cannot get configuration: %v", err)
 	}
-	token, authorized, err := getAccessToken(config)
+	var authorized bool
+	flags.token, authorized, err = getAccessToken(config)
 	if err != nil {
 		log.Fatalf("cannot get access token: %v", err)
 	}
@@ -733,168 +910,36 @@ func main() {
 		}
 	}
 
-	if len(media) > 0 {
-		for i := range media {
-			media[i], err = upload(token, media[i], nil)
+	if len(flags.media) > 0 {
+		for i := range flags.media {
+			flags.media[i], err = upload(flags.token, flags.media[i], nil)
 			if err != nil {
 				log.Fatalf("cannot upload media: %v", err)
 			}
 		}
 	}
 
-	if len(search) > 0 {
-		res := struct {
-			Statuses       []Tweet `json:"statuses"`
-			SearchMetadata `json:"search_metadata"`
-		}{}
-		opt := makeopt(
-			"tweet_mode", "extended",
-			"q", search,
-		)
-		opt = countToOpt(opt, count)
-		opt = untilToOpt(opt, until)
-		for {
-			opt = sinceToOpt(opt, since)
-			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/search/tweets.json", opt, &res)
-			if err != nil {
-				log.Fatalf("cannot get statuses: %v", err)
-			}
-			if len(res.Statuses) > 0 {
-				showTweets(res.Statuses, asjson, verbose)
-				since = res.Statuses[len(res.Statuses)-1].CreatedAt
-				opt = sinceToOpt(opt, since)
-			}
-			if delay == 0 {
-				break
-			}
-			time.Sleep(delay)
-		}
-	} else if reply {
-		var tweets []Tweet
-		opt := makeopt(
-			"tweet_mode", "extended",
-		)
-		opt = countToOpt(opt, count)
-		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/mentions_timeline.json", opt, &tweets)
-		if err != nil {
-			log.Fatalf("cannot get tweets: %v", err)
-		}
-		showTweets(tweets, asjson, verbose)
-	} else if list != "" {
-		part := strings.SplitN(list, "/", 2)
-		if len(part) == 1 {
-			var account Account
-			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/account/settings.json", nil, &account)
-			if err != nil {
-				log.Fatalf("cannot get account: %v", err)
-			}
-			part = []string{account.ScreenName, part[0]}
-		}
-		var tweets []Tweet
-		opt := makeopt(
-			"tweet_mode", "extended",
-			"owner_screen_name", part[0],
-			"slug", part[1],
-		)
-		opt = countToOpt(opt, count)
-		opt = sinceIDtoOpt(opt, sinceID)
-		opt = maxIDtoOpt(opt, maxID)
-		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/lists/statuses.json", opt, &tweets)
-		if err != nil {
-			log.Fatalf("cannot get tweets: %v", err)
-		}
-		showTweets(tweets, asjson, verbose)
-	} else if user != "" {
-		var tweets []Tweet
-		opt := makeopt(
-			"tweet_mode", "extended",
-			"screen_name", user,
-		)
-		opt = countToOpt(opt, count)
-		opt = sinceIDtoOpt(opt, sinceID)
-		opt = maxIDtoOpt(opt, maxID)
-		err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/user_timeline.json", opt, &tweets)
-		if err != nil {
-			log.Fatalf("cannot get tweets: %v", err)
-		}
-		showTweets(tweets, asjson, verbose)
-	} else if favorite != "" {
-		opt := makeopt(
-			"id", favorite,
-		)
-		err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/favorites/create.json", opt, nil)
-		if err != nil {
-			log.Fatalf("cannot create favorite: %v", err)
-		}
-		color.Set(color.FgHiRed)
-		fmt.Print(_EmojiRedHeart)
-		color.Set(color.Reset)
-		fmt.Println("favorited")
-	} else if fromfile != "" {
-		text, err := readFile(fromfile)
-		if err != nil {
-			log.Fatalf("cannot read a new tweet: %v", err)
-		}
-		var tweet Tweet
-		opt := makeopt(
-			"status", string(text),
-			"in_reply_to_status_id", inreply,
-			"media_ids", media.String(),
-		)
-		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
-		if err != nil {
-			log.Fatalf("cannot post tweet: %v", err)
-		}
-		fmt.Println("tweeted:", tweet.Identifier)
-	} else if flag.NArg() == 0 && len(media) == 0 {
-		if inreply != "" {
-			var tweet Tweet
-			opt := makeopt("tweet_mode", "extended")
-			opt = countToOpt(opt, count)
-			err := rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/retweet/"+inreply+".json", opt, &tweet)
-			if err != nil {
-				log.Fatalf("cannot retweet: %v", err)
-			}
-			color.Set(color.FgHiYellow)
-			fmt.Print(_EmojiHighVoltage)
-			color.Set(color.Reset)
-			fmt.Println("retweeted:", tweet.Identifier)
-		} else if delay > 0 {
-			var tweets []Tweet
-			opt := makeopt()
-			for {
-				opt = sinceToOpt(opt, since)
-				err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
-				if err != nil {
-					log.Fatalf("cannot get tweets: %v", err)
-				}
-				if len(tweets) > 0 {
-					showTweets(tweets, asjson, verbose)
-					since = tweets[len(tweets)-1].CreatedAt
-				}
-				time.Sleep(delay)
-			}
+	if len(flags.search) > 0 {
+		flags.searchTweets()
+	} else if flags.reply {
+		flags.showReplies()
+	} else if flags.list != "" {
+		flags.showListTweets()
+	} else if flags.user != "" {
+		flags.showUserTweets()
+	} else if flags.favorite != "" {
+		flags.favoriteTweet()
+	} else if flags.fromfile != "" {
+		flags.fromFile()
+	} else if flag.NArg() == 0 && len(flags.media) == 0 {
+		if flags.inreply != "" {
+			flags.doRetweet()
+		} else if flags.delay > 0 {
+			flags.doStream()
 		} else {
-			var tweets []Tweet
-			opt := makeopt("tweet_mode", "extended")
-			opt = countToOpt(opt, count)
-			err := rawCall(token, http.MethodGet, "https://api.twitter.com/1.1/statuses/home_timeline.json", opt, &tweets)
-			if err != nil {
-				log.Fatalf("cannot get tweets: %v", err)
-			}
-			showTweets(tweets, asjson, verbose)
+			flags.doShow()
 		}
 	} else {
-		var tweet Tweet
-		opt := makeopt(
-			"status", strings.Join(flag.Args(), " "),
-			"in_reply_to_status_id", inreply,
-			"media_ids", media.String(),
-		)
-		err = rawCall(token, http.MethodPost, "https://api.twitter.com/1.1/statuses/update.json", opt, &tweet)
-		if err != nil {
-			log.Fatalf("cannot post tweet: %v", err)
-		}
-		fmt.Println("tweeted:", tweet.Identifier)
+		flags.doTweet()
 	}
 }
