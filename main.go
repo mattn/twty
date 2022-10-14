@@ -252,7 +252,7 @@ func contentTypeOf(file string) (string, error) {
 	return ct, nil
 }
 
-func upload(token *oauth.Credentials, file string, opt map[string]string) (string, error) {
+func (flags *Flags) upload(file string, opt map[string]string) (string, error) {
 	mediaType, _ := contentTypeOf(file)
 	if mediaType == "" {
 		ext := filepath.Ext(strings.ToLower(file))
@@ -289,7 +289,7 @@ func upload(token *oauth.Credentials, file string, opt map[string]string) (strin
 		return "", err
 	}
 
-	oauthClient.SignParam(token, http.MethodPost, uri, param)
+	oauthClient.SignParam(flags.token, http.MethodPost, uri, param)
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
@@ -370,7 +370,7 @@ func upload(token *oauth.Credentials, file string, opt map[string]string) (strin
 			return "", err
 		}
 
-		oauthClient.SignParam(token, http.MethodPost, uri, param)
+		oauthClient.SignParam(flags.token, http.MethodPost, uri, param)
 
 		req.Header.Set("Content-Type", w.FormDataContentType())
 		req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
@@ -396,7 +396,7 @@ func upload(token *oauth.Credentials, file string, opt map[string]string) (strin
 		return "", err
 	}
 
-	oauthClient.SignParam(token, http.MethodPost, uri, param)
+	oauthClient.SignParam(flags.token, http.MethodPost, uri, param)
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "OAuth "+strings.Replace(param.Encode(), "&", ",", -1))
@@ -837,6 +837,39 @@ func isTimeFormat(t string) bool {
 	return true
 }
 
+func (flags *Flags) uploadMedias() {
+	var err error
+	for i := range flags.media {
+		flags.media[i], err = flags.upload(flags.media[i], nil)
+		if err != nil {
+			log.Fatalf("cannot upload media: %v", err)
+		}
+	}
+}
+
+func (flags *Flags) authorization() {
+	file, config, err := getConfig(flags.profile)
+	if err != nil {
+		log.Fatalf("cannot get configuration: %v", err)
+	}
+	var authorized bool
+	flags.token, authorized, err = getAccessToken(config)
+	if err != nil {
+		log.Fatalf("cannot get access token: %v", err)
+	}
+	if authorized {
+		b, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			log.Fatalf("cannot store file: %v", err)
+		}
+		err = ioutil.WriteFile(file, b, 0700)
+		if err != nil {
+			log.Fatalf("cannot store file: %v", err)
+		}
+	}
+
+}
+
 func main() {
 	var flags Flags
 
@@ -890,33 +923,10 @@ func main() {
 	}
 	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",http2client=0")
 
-	file, config, err := getConfig(flags.profile)
-	if err != nil {
-		log.Fatalf("cannot get configuration: %v", err)
-	}
-	var authorized bool
-	flags.token, authorized, err = getAccessToken(config)
-	if err != nil {
-		log.Fatalf("cannot get access token: %v", err)
-	}
-	if authorized {
-		b, err := json.MarshalIndent(config, "", "  ")
-		if err != nil {
-			log.Fatalf("cannot store file: %v", err)
-		}
-		err = ioutil.WriteFile(file, b, 0700)
-		if err != nil {
-			log.Fatalf("cannot store file: %v", err)
-		}
-	}
+	flags.authorization()
 
 	if len(flags.media) > 0 {
-		for i := range flags.media {
-			flags.media[i], err = upload(flags.token, flags.media[i], nil)
-			if err != nil {
-				log.Fatalf("cannot upload media: %v", err)
-			}
-		}
+		flags.uploadMedias()
 	}
 
 	if len(flags.search) > 0 {
