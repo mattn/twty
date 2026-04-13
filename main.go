@@ -740,23 +740,12 @@ func (app *App) getMyID() (string, error) {
 }
 
 func (app *App) searchTweets() {
-	params := v2TweetFields()
-	params["query"] = app.search
-	if app.count != "" {
-		params["max_results"] = app.count
-	}
-	if app.since != "" && isTimeFormat(app.since) {
-		params["start_time"] = app.since + "T00:00:00Z"
-	}
-	if app.until != "" && isTimeFormat(app.until) {
-		params["end_time"] = app.until + "T00:00:00Z"
-	}
+	sinceID := ""
 	if app.sinceID > 0 {
-		params["since_id"] = strconv.FormatInt(app.sinceID, 10)
+		sinceID = strconv.FormatInt(app.sinceID, 10)
 	}
 	for {
-		var res V2TweetsResponse
-		err := app.callGet("https://api.twitter.com/2/tweets/search/recent", params, &res)
+		res, err := app.fetchSearchTweets(app.search, app.count, app.since, app.until, sinceID)
 		if err != nil {
 			log.Fatalf("cannot search tweets: %v", err)
 		}
@@ -767,25 +756,14 @@ func (app *App) searchTweets() {
 			break
 		}
 		if res.Meta.NewestID != "" {
-			params["since_id"] = res.Meta.NewestID
+			sinceID = res.Meta.NewestID
 		}
 		time.Sleep(app.delay)
 	}
 }
 
 func (app *App) showReplies() {
-	myID, err := app.getMyID()
-	if err != nil {
-		log.Fatalf("cannot get user: %v", err)
-	}
-
-	params := v2TweetFields()
-	if app.count != "" {
-		params["max_results"] = app.count
-	}
-
-	var res V2TweetsResponse
-	err = app.callGet("https://api.twitter.com/2/users/"+myID+"/mentions", params, &res)
+	res, err := app.fetchMentions(app.count)
 	if err != nil {
 		log.Fatalf("cannot get mentions: %v", err)
 	}
@@ -793,57 +771,7 @@ func (app *App) showReplies() {
 }
 
 func (app *App) showListTweets() {
-	listID := app.list
-
-	if _, err := strconv.ParseInt(listID, 10, 64); err != nil {
-		part := strings.SplitN(app.list, "/", 2)
-
-		var ownerID string
-		if len(part) == 1 {
-			id, err := app.getMyID()
-			if err != nil {
-				log.Fatalf("cannot get user: %v", err)
-			}
-			ownerID = id
-		} else {
-			var userRes V2UserResponse
-			err := app.callGet("https://api.twitter.com/2/users/by/username/"+part[0], nil, &userRes)
-			if err != nil {
-				log.Fatalf("cannot look up user: %v", err)
-			}
-			ownerID = userRes.Data.ID
-		}
-
-		slug := part[len(part)-1]
-
-		var listsRes V2ListsResponse
-		err := app.callGet("https://api.twitter.com/2/users/"+ownerID+"/owned_lists", map[string]string{
-			"list.fields": "name",
-		}, &listsRes)
-		if err != nil {
-			log.Fatalf("cannot get lists: %v", err)
-		}
-
-		found := false
-		for _, l := range listsRes.Data {
-			if strings.EqualFold(l.Name, slug) {
-				listID = l.ID
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Fatalf("list not found: %s", slug)
-		}
-	}
-
-	params := v2TweetFields()
-	if app.count != "" {
-		params["max_results"] = app.count
-	}
-
-	var res V2TweetsResponse
-	err := app.callGet("https://api.twitter.com/2/lists/"+listID+"/tweets", params, &res)
+	res, err := app.fetchListTweets(app.list, app.count)
 	if err != nil {
 		log.Fatalf("cannot get list tweets: %v", err)
 	}
@@ -851,25 +779,14 @@ func (app *App) showListTweets() {
 }
 
 func (app *App) showUserTweets() {
-	var userRes V2UserResponse
-	err := app.callGet("https://api.twitter.com/2/users/by/username/"+app.user, nil, &userRes)
-	if err != nil {
-		log.Fatalf("cannot look up user: %v", err)
-	}
-
-	params := v2TweetFields()
-	if app.count != "" {
-		params["max_results"] = app.count
-	}
+	sinceID, maxID := "", ""
 	if app.sinceID > 0 {
-		params["since_id"] = strconv.FormatInt(app.sinceID, 10)
+		sinceID = strconv.FormatInt(app.sinceID, 10)
 	}
 	if app.maxID > 0 {
-		params["until_id"] = strconv.FormatInt(app.maxID, 10)
+		maxID = strconv.FormatInt(app.maxID, 10)
 	}
-
-	var res V2TweetsResponse
-	err = app.callGet("https://api.twitter.com/2/users/"+userRes.Data.ID+"/tweets", params, &res)
+	res, err := app.fetchUserTweets(app.user, app.count, sinceID, maxID)
 	if err != nil {
 		log.Fatalf("cannot get tweets: %v", err)
 	}
@@ -877,16 +794,7 @@ func (app *App) showUserTweets() {
 }
 
 func (app *App) favoriteTweet() {
-	myID, err := app.getMyID()
-	if err != nil {
-		log.Fatalf("cannot get user: %v", err)
-	}
-
-	body := map[string]string{
-		"tweet_id": app.favorite,
-	}
-	err = app.callPost("https://api.twitter.com/2/users/"+myID+"/likes", body, nil)
-	if err != nil {
+	if err := app.likeTweet(app.favorite); err != nil {
 		log.Fatalf("cannot create favorite: %v", err)
 	}
 	color.Set(color.FgHiRed)
@@ -900,38 +808,15 @@ func (app *App) fromFile() {
 	if err != nil {
 		log.Fatalf("cannot read a new tweet: %v", err)
 	}
-	body := map[string]interface{}{
-		"text": string(text),
-	}
-	if app.inreply != "" {
-		body["reply"] = map[string]string{
-			"in_reply_to_tweet_id": app.inreply,
-		}
-	}
-	if len(app.media) > 0 {
-		body["media"] = map[string]interface{}{
-			"media_ids": []string(app.media),
-		}
-	}
-	var res V2TweetResponse
-	err = app.callPost("https://api.twitter.com/2/tweets", body, &res)
+	id, err := app.createTweet(string(text), app.inreply, []string(app.media))
 	if err != nil {
 		log.Fatalf("cannot post tweet: %v", err)
 	}
-	fmt.Println("tweeted:", res.Data.ID)
+	fmt.Println("tweeted:", id)
 }
 
 func (app *App) doRetweet() {
-	myID, err := app.getMyID()
-	if err != nil {
-		log.Fatalf("cannot get user: %v", err)
-	}
-
-	body := map[string]string{
-		"tweet_id": app.inreply,
-	}
-	err = app.callPost("https://api.twitter.com/2/users/"+myID+"/retweets", body, nil)
-	if err != nil {
+	if err := app.retweet(app.inreply); err != nil {
 		log.Fatalf("cannot retweet: %v", err)
 	}
 	color.Set(color.FgHiYellow)
@@ -941,19 +826,9 @@ func (app *App) doRetweet() {
 }
 
 func (app *App) doStream() {
-	myID, err := app.getMyID()
-	if err != nil {
-		log.Fatalf("cannot get user: %v", err)
-	}
-
-	params := v2TweetFields()
 	var sinceID string
 	for {
-		if sinceID != "" {
-			params["since_id"] = sinceID
-		}
-		var res V2TweetsResponse
-		err := app.callGet("https://api.twitter.com/2/users/"+myID+"/timelines/reverse_chronological", params, &res)
+		res, err := app.fetchHomeTweets("", sinceID, "")
 		if err != nil {
 			log.Fatalf("cannot get tweets: %v", err)
 		}
@@ -966,24 +841,14 @@ func (app *App) doStream() {
 }
 
 func (app *App) doShow() {
-	myID, err := app.getMyID()
-	if err != nil {
-		log.Fatalf("cannot get user: %v", err)
-	}
-
-	params := v2TweetFields()
-	if app.count != "" {
-		params["max_results"] = app.count
-	}
+	sinceID, maxID := "", ""
 	if app.sinceID > 0 {
-		params["since_id"] = strconv.FormatInt(app.sinceID, 10)
+		sinceID = strconv.FormatInt(app.sinceID, 10)
 	}
 	if app.maxID > 0 {
-		params["until_id"] = strconv.FormatInt(app.maxID, 10)
+		maxID = strconv.FormatInt(app.maxID, 10)
 	}
-
-	var res V2TweetsResponse
-	err = app.callGet("https://api.twitter.com/2/users/"+myID+"/timelines/reverse_chronological", params, &res)
+	res, err := app.fetchHomeTweets(app.count, sinceID, maxID)
 	if err != nil {
 		log.Fatalf("cannot get tweets: %v", err)
 	}
@@ -991,25 +856,12 @@ func (app *App) doShow() {
 }
 
 func (app *App) doTweet() {
-	body := map[string]interface{}{
-		"text": strings.Join(flag.Args(), " "),
-	}
-	if app.inreply != "" {
-		body["reply"] = map[string]string{
-			"in_reply_to_tweet_id": app.inreply,
-		}
-	}
-	if len(app.media) > 0 {
-		body["media"] = map[string]interface{}{
-			"media_ids": []string(app.media),
-		}
-	}
-	var res V2TweetResponse
-	err := app.callPost("https://api.twitter.com/2/tweets", body, &res)
+	text := strings.Join(flag.Args(), " ")
+	id, err := app.createTweet(text, app.inreply, []string(app.media))
 	if err != nil {
 		log.Fatalf("cannot post tweet: %v", err)
 	}
-	fmt.Println("tweeted:", res.Data.ID)
+	fmt.Println("tweeted:", id)
 }
 
 type App struct {
@@ -1038,6 +890,7 @@ type App struct {
 	verbose     bool
 	showVersion bool
 	debug       bool
+	mcp         bool
 }
 
 func readFile(filename string) ([]byte, error) {
@@ -1088,6 +941,7 @@ func parseFlags(app *App) {
 	flag.BoolVar(&app.verbose, "v", false, "detail display")
 	flag.BoolVar(&app.debug, "debug", false, "debug json")
 	flag.BoolVar(&app.showVersion, "V", false, "Print the version")
+	flag.BoolVar(&app.mcp, "mcp", false, "run as MCP server")
 
 	flag.StringVar(&app.fromfile, "ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
 	flag.StringVar(&app.count, "count", "", "fetch tweets count")
@@ -1128,6 +982,17 @@ func main() {
 	parseFlags(&app)
 	if app.showVersion {
 		fmt.Printf("%s %s (rev: %s/%s)\n", name, version, revision, runtime.Version())
+		return
+	}
+
+	if app.mcp {
+		if err := app.loadConfig(); err != nil {
+			log.Fatalf("cannot load configuration: %v", err)
+		}
+		if app.config.Token.AccessToken == "" {
+			log.Fatal("no access token configured; run twty without -mcp first to authorize")
+		}
+		app.serveMCP()
 		return
 	}
 
