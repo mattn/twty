@@ -80,6 +80,40 @@ For windows user: `%APPDATA%/twty/settings.json`
 
     $ twty -S 60s
 
+### MCP server mode
+
+twty can run as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server, allowing AI assistants like Claude to interact with X directly.
+
+    $ twty -mcp
+
+To use with Claude Code, add the following to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "twty": {
+      "command": "twty",
+      "args": ["-mcp"]
+    }
+  }
+}
+```
+
+Available tools:
+
+| Tool | Description |
+|------|-------------|
+| `get_timeline` | Get your home timeline |
+| `search_tweets` | Search recent tweets |
+| `get_mentions` | Get your mentions and replies |
+| `get_user_tweets` | Get tweets from a specific user |
+| `get_list_tweets` | Get tweets from a list |
+| `post_tweet` | Post a new tweet (with optional reply) |
+| `like_tweet` | Like a tweet |
+| `retweet` | Retweet a tweet |
+
+**Note:** You must run `twty` at least once without `-mcp` first to complete OAuth authorization.
+
 ### All options
 
     -a PROFILE: switch profile to load configuration file.
@@ -90,6 +124,7 @@ For windows user: `%APPDATA%/twty/settings.json`
     -u USER: show user's timeline
     -s WORD: search timeline
     -S DELAY: tweets after DELAY
+    -mcp: run as MCP server
     -json: as JSON
     -r: show replies
     -v: detail display
