@@ -998,6 +998,9 @@ const usage = `Usage of twty:
   -until DATE: show tweets created before the DATE (ex. 2017-05-31)
   -since_id NUMBER: show tweets that have ids greater than NUMBER.
   -max_id NUMBER: show tweets that have ids lower than NUMBER.
+  -mcp: run as MCP server over stdio.
+  -debug: dump raw API responses.
+  -V: print the version.
 `
 
 func main() {
