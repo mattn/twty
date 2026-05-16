@@ -234,7 +234,11 @@ func (app *App) authorize() error {
 
 	server := &http.Server{Handler: mux}
 	go server.Serve(listener)
-	defer server.Shutdown(context.Background())
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(ctx)
+	}()
 
 	color.Set(color.FgHiRed)
 	fmt.Println("Open this URL to authorize.")
