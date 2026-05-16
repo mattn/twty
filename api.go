@@ -39,7 +39,7 @@ func (app *App) fetchSearchTweets(query, count, since, until, sinceID string) (V
 		params["start_time"] = since + "T00:00:00Z"
 	}
 	if until != "" && isTimeFormat(until) {
-		params["end_time"] = until + "T00:00:00Z"
+		params["end_time"] = until + "T23:59:59Z"
 	}
 	if sinceID != "" {
 		params["since_id"] = sinceID
