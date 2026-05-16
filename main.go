@@ -605,12 +605,15 @@ func (app *App) upload(file string) (string, error) {
 	}
 	defer f.Close()
 
+	payload := make([]byte, 1024*5000)
 	index := 0
 	for size > 0 {
-		var payload [1024 * 5000]byte
-		n, err := f.Read(payload[:])
-		if err != nil {
+		n, err := io.ReadFull(f, payload)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			return "", err
+		}
+		if n == 0 {
+			break
 		}
 
 		var buf bytes.Buffer
