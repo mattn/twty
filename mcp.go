@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strconv"
 )
 
 type jsonrpcRequest struct {
@@ -46,27 +47,27 @@ var mcpTools = []mcpTool{
 	{
 		Name:        "get_timeline",
 		Description: "Get your X (Twitter) home timeline",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"string","description":"Number of tweets to fetch (max 100)"}}}`),
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}}}`),
 	},
 	{
 		Name:        "search_tweets",
 		Description: "Search recent tweets on X (Twitter)",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"count":{"type":"string","description":"Number of tweets to fetch (max 100)"}},"required":["query"]}`),
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["query"]}`),
 	},
 	{
 		Name:        "get_mentions",
 		Description: "Get your mentions and replies on X (Twitter)",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"string","description":"Number of tweets to fetch (max 100)"}}}`),
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}}}`),
 	},
 	{
 		Name:        "get_user_tweets",
 		Description: "Get tweets from a specific user on X (Twitter)",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"username":{"type":"string","description":"Twitter username (without @)"},"count":{"type":"string","description":"Number of tweets to fetch (max 100)"}},"required":["username"]}`),
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"username":{"type":"string","description":"Twitter username (without @)"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["username"]}`),
 	},
 	{
 		Name:        "get_list_tweets",
 		Description: "Get tweets from a list on X (Twitter)",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"list":{"type":"string","description":"List ID or owner/list-name"},"count":{"type":"string","description":"Number of tweets to fetch (max 100)"}},"required":["list"]}`),
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"list":{"type":"string","description":"List ID or owner/list-name"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["list"]}`),
 	},
 	{
 		Name:        "post_tweet",
@@ -203,13 +204,20 @@ func errorResult(err error) *mcpToolResult {
 	}
 }
 
+func countString(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
+}
+
 func (app *App) mcpGetTimeline(args json.RawMessage) (*mcpToolResult, *jsonrpcError) {
 	var p struct {
-		Count string `json:"count"`
+		Count int `json:"count"`
 	}
 	json.Unmarshal(args, &p)
 
-	res, err := app.fetchHomeTweets(p.Count, "", "")
+	res, err := app.fetchHomeTweets(countString(p.Count), "", "")
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -219,7 +227,7 @@ func (app *App) mcpGetTimeline(args json.RawMessage) (*mcpToolResult, *jsonrpcEr
 func (app *App) mcpSearchTweets(args json.RawMessage) (*mcpToolResult, *jsonrpcError) {
 	var p struct {
 		Query string `json:"query"`
-		Count string `json:"count"`
+		Count int    `json:"count"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return nil, &jsonrpcError{Code: -32602, Message: "invalid arguments"}
@@ -228,7 +236,7 @@ func (app *App) mcpSearchTweets(args json.RawMessage) (*mcpToolResult, *jsonrpcE
 		return nil, &jsonrpcError{Code: -32602, Message: "query is required"}
 	}
 
-	res, err := app.fetchSearchTweets(p.Query, p.Count, "", "", "")
+	res, err := app.fetchSearchTweets(p.Query, countString(p.Count), "", "", "")
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -237,11 +245,11 @@ func (app *App) mcpSearchTweets(args json.RawMessage) (*mcpToolResult, *jsonrpcE
 
 func (app *App) mcpGetMentions(args json.RawMessage) (*mcpToolResult, *jsonrpcError) {
 	var p struct {
-		Count string `json:"count"`
+		Count int `json:"count"`
 	}
 	json.Unmarshal(args, &p)
 
-	res, err := app.fetchMentions(p.Count)
+	res, err := app.fetchMentions(countString(p.Count))
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -251,7 +259,7 @@ func (app *App) mcpGetMentions(args json.RawMessage) (*mcpToolResult, *jsonrpcEr
 func (app *App) mcpGetUserTweets(args json.RawMessage) (*mcpToolResult, *jsonrpcError) {
 	var p struct {
 		Username string `json:"username"`
-		Count    string `json:"count"`
+		Count    int    `json:"count"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return nil, &jsonrpcError{Code: -32602, Message: "invalid arguments"}
@@ -260,7 +268,7 @@ func (app *App) mcpGetUserTweets(args json.RawMessage) (*mcpToolResult, *jsonrpc
 		return nil, &jsonrpcError{Code: -32602, Message: "username is required"}
 	}
 
-	res, err := app.fetchUserTweets(p.Username, p.Count, "", "")
+	res, err := app.fetchUserTweets(p.Username, countString(p.Count), "", "")
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -270,7 +278,7 @@ func (app *App) mcpGetUserTweets(args json.RawMessage) (*mcpToolResult, *jsonrpc
 func (app *App) mcpGetListTweets(args json.RawMessage) (*mcpToolResult, *jsonrpcError) {
 	var p struct {
 		List  string `json:"list"`
-		Count string `json:"count"`
+		Count int    `json:"count"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return nil, &jsonrpcError{Code: -32602, Message: "invalid arguments"}
@@ -279,7 +287,7 @@ func (app *App) mcpGetListTweets(args json.RawMessage) (*mcpToolResult, *jsonrpc
 		return nil, &jsonrpcError{Code: -32602, Message: "list is required"}
 	}
 
-	res, err := app.fetchListTweets(p.List, p.Count)
+	res, err := app.fetchListTweets(p.List, countString(p.Count))
 	if err != nil {
 		return errorResult(err), nil
 	}
