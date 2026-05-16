@@ -88,7 +88,8 @@ var mcpTools = []mcpTool{
 func (app *App) serveMCP() {
 	enc := json.NewEncoder(os.Stdout)
 	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	const maxMCPMessageSize = 16 * 1024 * 1024
+	scanner.Buffer(make([]byte, 64*1024), maxMCPMessageSize)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -138,7 +139,10 @@ func (app *App) serveMCP() {
 			resp.Error = &jsonrpcError{Code: -32601, Message: "method not found: " + req.Method}
 		}
 
-		enc.Encode(resp)
+		if err := enc.Encode(resp); err != nil {
+			log.Printf("cannot encode response: %v", err)
+			return
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
