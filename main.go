@@ -171,11 +171,16 @@ func openBrowser(url string) {
 	}
 	browser, err := exec.LookPath(browser)
 	if err != nil {
+		log.Printf("cannot locate browser: %v", err)
 		return
 	}
 	cmd := exec.Command(browser, args...)
 	cmd.Stderr = os.Stderr
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		log.Printf("cannot start browser: %v", err)
+		return
+	}
+	go cmd.Wait()
 }
 
 func (app *App) authorize() error {
