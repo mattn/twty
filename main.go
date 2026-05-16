@@ -828,11 +828,10 @@ func (app *App) doRetweet() {
 func (app *App) doStream() {
 	var sinceID string
 	for {
-		res, err := app.fetchHomeTweets("", sinceID, "")
+		res, err := app.fetchHomeTweets(app.count, sinceID, "")
 		if err != nil {
-			log.Fatalf("cannot get tweets: %v", err)
-		}
-		if len(res.Data) > 0 {
+			log.Printf("cannot get tweets: %v", err)
+		} else if len(res.Data) > 0 {
 			showV2Tweets(res, app.asjson, app.verbose)
 			sinceID = res.Meta.NewestID
 		}
