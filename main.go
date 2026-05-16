@@ -367,13 +367,16 @@ func (app *App) loadConfig() error {
 	if app.profile == "" {
 		app.configFile = filepath.Join(dir, "settings.json")
 	} else if app.profile == "?" {
-		names, err := filepath.Glob(filepath.Join(dir, "settings*.json"))
+		names, err := filepath.Glob(filepath.Join(dir, "settings-*.json"))
 		if err != nil {
 			return err
 		}
 		for _, n := range names {
 			n = filepath.Base(n)
-			n = strings.TrimLeft(n[8:len(n)-5], "-")
+			n = strings.TrimSuffix(strings.TrimPrefix(n, "settings-"), ".json")
+			if n == "" {
+				continue
+			}
 			fmt.Println(n)
 		}
 		os.Exit(0)
