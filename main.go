@@ -743,6 +743,13 @@ func tweetText(tweet V2Tweet, tweetMap map[string]V2Tweet) string {
 			}
 		}
 	}
+	for _, ref := range tweet.ReferencedTweets {
+		if ref.Type == "quoted" {
+			if qt, ok := tweetMap[ref.ID]; ok {
+				return tweet.Text + "\n  > " + qt.Text
+			}
+		}
+	}
 	return tweet.Text
 }
 
