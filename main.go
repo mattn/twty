@@ -131,10 +131,12 @@ func (f *files) Set(value string) error {
 	return nil
 }
 
-func generateCodeVerifier() string {
+func generateCodeVerifier() (string, error) {
 	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 func generateCodeChallenge(verifier string) string {
@@ -142,10 +144,12 @@ func generateCodeChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(h[:])
 }
 
-func generateState() string {
+func generateState() (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 func openBrowser(url string) {
@@ -175,9 +179,15 @@ func openBrowser(url string) {
 }
 
 func (app *App) authorize() error {
-	codeVerifier := generateCodeVerifier()
+	codeVerifier, err := generateCodeVerifier()
+	if err != nil {
+		return fmt.Errorf("cannot generate code verifier: %v", err)
+	}
 	codeChallenge := generateCodeChallenge(codeVerifier)
-	state := generateState()
+	state, err := generateState()
+	if err != nil {
+		return fmt.Errorf("cannot generate state: %v", err)
+	}
 
 	redirectURI := fmt.Sprintf("http://localhost:%d/callback", callbackPort)
 
