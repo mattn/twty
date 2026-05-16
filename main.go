@@ -342,15 +342,15 @@ func (app *App) ensureValidToken() error {
 }
 
 func configDir() (string, error) {
-	dir := os.Getenv("HOME")
-	if dir == "" && runtime.GOOS == "windows" {
+	var dir string
+	if runtime.GOOS == "windows" {
 		dir = os.Getenv("APPDATA")
 		if dir == "" {
-			dir = filepath.Join(os.Getenv("USERPROFILE"), "Application Data", "twty")
+			dir = filepath.Join(os.Getenv("USERPROFILE"), "Application Data")
 		}
 		dir = filepath.Join(dir, "twty")
 	} else {
-		dir = filepath.Join(dir, ".config", "twty")
+		dir = filepath.Join(os.Getenv("HOME"), ".config", "twty")
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
