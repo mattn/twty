@@ -338,6 +338,9 @@ func (app *App) decodeTokenResponse(r io.Reader) error {
 }
 
 func (app *App) ensureValidToken() error {
+	if app.config.Token.AccessToken == "" {
+		return errors.New("no access token configured, please run twty without -mcp first to authorize")
+	}
 	if time.Now().Before(app.config.Token.ExpiresAt.Add(-30 * time.Second)) {
 		return nil
 	}
