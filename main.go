@@ -833,7 +833,7 @@ func (app *App) fromFile() {
 	if err != nil {
 		log.Fatalf("cannot read a new tweet: %v", err)
 	}
-	id, err := app.createTweet(string(text), app.inreply, []string(app.media))
+	id, err := app.createTweet(strings.TrimRight(string(text), "\r\n"), app.inreply, app.media)
 	if err != nil {
 		log.Fatalf("cannot post tweet: %v", err)
 	}
@@ -881,7 +881,7 @@ func (app *App) doShow() {
 
 func (app *App) doTweet() {
 	text := strings.Join(flag.Args(), " ")
-	id, err := app.createTweet(text, app.inreply, []string(app.media))
+	id, err := app.createTweet(text, app.inreply, app.media)
 	if err != nil {
 		log.Fatalf("cannot post tweet: %v", err)
 	}
