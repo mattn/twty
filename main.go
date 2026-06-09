@@ -434,7 +434,7 @@ func (app *App) authorization() {
 	}
 }
 
-func (app *App) callGet(uri string, params map[string]string, res interface{}) error {
+func (app *App) callGet(uri string, params map[string]string, res any) error {
 	if err := app.ensureValidToken(); err != nil {
 		return err
 	}
@@ -472,7 +472,7 @@ func (app *App) callGet(uri string, params map[string]string, res interface{}) e
 	return json.NewDecoder(resp.Body).Decode(&res)
 }
 
-func (app *App) callPost(uri string, body interface{}, res interface{}) error {
+func (app *App) callPost(uri string, body any, res any) error {
 	if err := app.ensureValidToken(); err != nil {
 		return err
 	}
@@ -507,7 +507,7 @@ func (app *App) callPost(uri string, body interface{}, res interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(&res)
 }
 
-func (app *App) callPostForm(uri string, param url.Values, res interface{}) error {
+func (app *App) callPostForm(uri string, param url.Values, res any) error {
 	if err := app.ensureValidToken(); err != nil {
 		return err
 	}
@@ -534,7 +534,7 @@ func (app *App) callPostForm(uri string, param url.Values, res interface{}) erro
 	return json.NewDecoder(resp.Body).Decode(&res)
 }
 
-func (app *App) callPostMultipart(uri string, buf *bytes.Buffer, contentType string, res interface{}) error {
+func (app *App) callPostMultipart(uri string, buf *bytes.Buffer, contentType string, res any) error {
 	if err := app.ensureValidToken(); err != nil {
 		return err
 	}

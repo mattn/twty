@@ -115,18 +115,18 @@ func (app *App) serveMCP() {
 
 		switch req.Method {
 		case "initialize":
-			resp.Result = mustMarshal(map[string]interface{}{
+			resp.Result = mustMarshal(map[string]any{
 				"protocolVersion": "2024-11-05",
-				"capabilities": map[string]interface{}{
-					"tools": map[string]interface{}{},
+				"capabilities": map[string]any{
+					"tools": map[string]any{},
 				},
-				"serverInfo": map[string]interface{}{
+				"serverInfo": map[string]any{
 					"name":    name,
 					"version": version,
 				},
 			})
 		case "tools/list":
-			resp.Result = mustMarshal(map[string]interface{}{
+			resp.Result = mustMarshal(map[string]any{
 				"tools": mcpTools,
 			})
 		case "tools/call":
@@ -151,7 +151,7 @@ func (app *App) serveMCP() {
 	}
 }
 
-func mustMarshal(v interface{}) json.RawMessage {
+func mustMarshal(v any) json.RawMessage {
 	b, err := json.Marshal(v)
 	if err != nil {
 		log.Printf("marshal error: %v", err)
