@@ -915,9 +915,37 @@ func leadingDigits(s string) string {
 	return s
 }
 
+// expandShortURL resolves t.co short URLs to the actual tweet URL by
+// following redirects. Other URLs are returned as-is.
+func expandShortURL(s string) string {
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Timeout: 10 * time.Second,
+	}
+	for range 5 {
+		u, err := url.Parse(s)
+		if err != nil || u.Host != "t.co" {
+			return s
+		}
+		resp, err := client.Get(s)
+		if err != nil {
+			return s
+		}
+		resp.Body.Close()
+		loc := resp.Header.Get("Location")
+		if resp.StatusCode < 300 || resp.StatusCode >= 400 || loc == "" {
+			return s
+		}
+		s = loc
+	}
+	return s
+}
+
 // parseTweetTarget extracts a tweet ID or username from an X (Twitter) URL.
 // It accepts a raw tweet ID, a status URL like https://x.com/user/status/123,
-// or a profile URL like https://x.com/user.
+// a profile URL like https://x.com/user, or a t.co short URL.
 func parseTweetTarget(s string) (tweetID string, username string, err error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -929,6 +957,7 @@ func parseTweetTarget(s string) (tweetID string, username string, err error) {
 	if !strings.Contains(s, "://") {
 		s = "https://" + s
 	}
+	s = expandShortURL(s)
 	u, err := url.Parse(s)
 	if err != nil {
 		return "", "", err

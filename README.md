@@ -58,7 +58,8 @@ For windows user: `%APPDATA%/twty/settings.json`
 
 This is handy for AI assistants like Claude: x.com refuses direct fetching,
 so let them run `twty -read URL` instead. A profile URL such as
-`https://x.com/USERNAME` shows the user's recent tweets.
+`https://x.com/USERNAME` shows the user's recent tweets, and `t.co`
+short URLs are expanded automatically.
 
 ### Show replies/mentions
 

@@ -71,8 +71,8 @@ var mcpTools = []mcpTool{
 	},
 	{
 		Name:        "read_tweet",
-		Description: "Read a tweet from an X (Twitter) URL or tweet ID. Use this instead of fetching x.com / twitter.com URLs directly. A profile URL returns the user's recent tweets.",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"X URL (https://x.com/user/status/ID or https://x.com/user) or tweet ID"}},"required":["url"]}`),
+		Description: "Read a tweet from an X (Twitter) URL or tweet ID. Use this instead of fetching x.com / twitter.com / t.co URLs directly. A profile URL returns the user's recent tweets.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"X URL (https://x.com/user/status/ID, https://x.com/user or https://t.co/XXX) or tweet ID"}},"required":["url"]}`),
 	},
 	{
 		Name:        "post_tweet",
