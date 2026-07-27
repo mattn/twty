@@ -93,6 +93,11 @@ type V2TweetResponse struct {
 	} `json:"data"`
 }
 
+type V2SingleTweetResponse struct {
+	Data     V2Tweet    `json:"data"`
+	Includes V2Includes `json:"includes"`
+}
+
 type V2MeResponse struct {
 	Data V2User `json:"data"`
 }
@@ -889,6 +894,82 @@ func (app *App) doShow() {
 	showV2Tweets(res, app.asjson, app.verbose)
 }
 
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func leadingDigits(s string) string {
+	for i, r := range s {
+		if r < '0' || r > '9' {
+			return s[:i]
+		}
+	}
+	return s
+}
+
+// parseTweetTarget extracts a tweet ID or username from an X (Twitter) URL.
+// It accepts a raw tweet ID, a status URL like https://x.com/user/status/123,
+// or a profile URL like https://x.com/user.
+func parseTweetTarget(s string) (tweetID string, username string, err error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", "", errors.New("empty URL")
+	}
+	if isDigits(s) {
+		return s, "", nil
+	}
+	if !strings.Contains(s, "://") {
+		s = "https://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return "", "", err
+	}
+	seg := strings.Split(strings.Trim(u.Path, "/"), "/")
+	for i, p := range seg {
+		if (p == "status" || p == "statuses") && i+1 < len(seg) {
+			if id := leadingDigits(seg[i+1]); id != "" {
+				return id, "", nil
+			}
+			return "", "", fmt.Errorf("invalid tweet ID in URL: %s", s)
+		}
+	}
+	if seg[0] != "" {
+		name := strings.TrimPrefix(seg[0], "@")
+		switch name {
+		case "i", "home", "explore", "search", "notifications", "messages", "settings", "intent", "hashtag":
+		default:
+			return "", name, nil
+		}
+	}
+	return "", "", fmt.Errorf("cannot find tweet ID or username in URL: %s", s)
+}
+
+func (app *App) doRead() {
+	tweetID, username, err := parseTweetTarget(app.readURL)
+	if err != nil {
+		log.Fatalf("cannot read tweet: %v", err)
+	}
+	var res V2TweetsResponse
+	if tweetID != "" {
+		res, err = app.fetchTweet(tweetID)
+	} else {
+		res, err = app.fetchUserTweets(username, app.count, "", "")
+	}
+	if err != nil {
+		log.Fatalf("cannot read tweet: %v", err)
+	}
+	showV2Tweets(res, app.asjson, app.verbose)
+}
+
 func (app *App) doTweet() {
 	text := strings.Join(flag.Args(), " ")
 	id, err := app.createTweet(text, app.inreply, app.media)
@@ -906,6 +987,7 @@ type App struct {
 	user     string
 	favorite string
 	search   string
+	readURL  string
 	inreply  string
 	delay    time.Duration
 	media    files
@@ -969,6 +1051,7 @@ func parseFlags(app *App) {
 	flag.StringVar(&app.user, "u", "", "show user timeline")
 	flag.StringVar(&app.favorite, "f", "", "specify favorite ID")
 	flag.StringVar(&app.search, "s", "", "search word")
+	flag.StringVar(&app.readURL, "read", "", "read tweet from URL or ID")
 	flag.StringVar(&app.inreply, "i", "", "specify in-reply ID, if not specify text, it will be RT.")
 	flag.Var(&app.media, "m", "upload media")
 	flag.DurationVar(&app.delay, "S", 0, "delay")
@@ -998,6 +1081,7 @@ const usage = `Usage of twty:
   -m FILE: upload media
   -u USER: show user's timeline
   -s WORD: search timeline
+  -read URL: read tweet(s) from an X URL or tweet ID (status or profile URL)
   -S DELAY tweets after DELAY
   -json: as JSON
   -r: show replies
@@ -1041,6 +1125,8 @@ func main() {
 
 	if len(app.search) > 0 {
 		app.searchTweets()
+	} else if app.readURL != "" {
+		app.doRead()
 	} else if app.reply {
 		app.showReplies()
 	} else if app.list != "" {

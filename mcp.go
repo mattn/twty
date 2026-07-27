@@ -70,6 +70,11 @@ var mcpTools = []mcpTool{
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"list":{"type":"string","description":"List ID or owner/list-name"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["list"]}`),
 	},
 	{
+		Name:        "read_tweet",
+		Description: "Read a tweet from an X (Twitter) URL or tweet ID. Use this instead of fetching x.com / twitter.com URLs directly. A profile URL returns the user's recent tweets.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"X URL (https://x.com/user/status/ID or https://x.com/user) or tweet ID"}},"required":["url"]}`),
+	},
+	{
 		Name:        "post_tweet",
 		Description: "Post a new tweet on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"text":{"type":"string","description":"Tweet text"},"reply_to":{"type":"string","description":"Tweet ID to reply to"}},"required":["text"]}`),
@@ -180,6 +185,8 @@ func (app *App) handleToolCall(params json.RawMessage) (*mcpToolResult, *jsonrpc
 		return app.mcpGetUserTweets(req.Arguments)
 	case "get_list_tweets":
 		return app.mcpGetListTweets(req.Arguments)
+	case "read_tweet":
+		return app.mcpReadTweet(req.Arguments)
 	case "post_tweet":
 		return app.mcpPostTweet(req.Arguments)
 	case "like_tweet":
@@ -288,6 +295,33 @@ func (app *App) mcpGetListTweets(args json.RawMessage) (*mcpToolResult, *jsonrpc
 	}
 
 	res, err := app.fetchListTweets(p.List, countString(p.Count))
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return textResult(formatTweetsText(res)), nil
+}
+
+func (app *App) mcpReadTweet(args json.RawMessage) (*mcpToolResult, *jsonrpcError) {
+	var p struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return nil, &jsonrpcError{Code: -32602, Message: "invalid arguments"}
+	}
+	if p.URL == "" {
+		return nil, &jsonrpcError{Code: -32602, Message: "url is required"}
+	}
+
+	tweetID, username, err := parseTweetTarget(p.URL)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	var res V2TweetsResponse
+	if tweetID != "" {
+		res, err = app.fetchTweet(tweetID)
+	} else {
+		res, err = app.fetchUserTweets(username, "", "", "")
+	}
 	if err != nil {
 		return errorResult(err), nil
 	}

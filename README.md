@@ -51,6 +51,15 @@ For windows user: `%APPDATA%/twty/settings.json`
 
     $ twty -s KEYWORD
 
+### Read a tweet from URL
+
+    $ twty -read https://x.com/USERNAME/status/TWEET_ID
+    $ twty -read TWEET_ID
+
+This is handy for AI assistants like Claude: x.com refuses direct fetching,
+so let them run `twty -read URL` instead. A profile URL such as
+`https://x.com/USERNAME` shows the user's recent tweets.
+
 ### Show replies/mentions
 
     $ twty -r
@@ -108,6 +117,7 @@ Available tools:
 | `get_mentions` | Get your mentions and replies |
 | `get_user_tweets` | Get tweets from a specific user |
 | `get_list_tweets` | Get tweets from a list |
+| `read_tweet` | Read a tweet from an X URL or tweet ID |
 | `post_tweet` | Post a new tweet (with optional reply) |
 | `like_tweet` | Like a tweet |
 | `retweet` | Retweet a tweet |
@@ -123,6 +133,7 @@ Available tools:
     -m FILE: upload media
     -u USER: show user's timeline
     -s WORD: search timeline
+    -read URL: read tweet(s) from an X URL or tweet ID (status or profile URL)
     -S DELAY: tweets after DELAY
     -mcp: run as MCP server
     -json: as JSON

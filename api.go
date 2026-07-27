@@ -29,6 +29,19 @@ func (app *App) fetchHomeTweets(count, sinceID, maxID string) (V2TweetsResponse,
 	return res, err
 }
 
+func (app *App) fetchTweet(id string) (V2TweetsResponse, error) {
+	var res V2SingleTweetResponse
+	err := app.callGet("https://api.twitter.com/2/tweets/"+id, v2TweetFields(), &res)
+	if err != nil {
+		return V2TweetsResponse{}, err
+	}
+	return V2TweetsResponse{
+		Data:     []V2Tweet{res.Data},
+		Includes: res.Includes,
+		Meta:     V2Meta{ResultCount: 1},
+	}, nil
+}
+
 func (app *App) fetchSearchTweets(query, count, since, until, sinceID string) (V2TweetsResponse, error) {
 	params := v2TweetFields()
 	params["query"] = query
