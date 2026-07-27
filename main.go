@@ -30,7 +30,7 @@ import (
 
 const name = "twty"
 
-const version = "0.1.5"
+const version = "0.1.6"
 
 var revision = "HEAD"
 
