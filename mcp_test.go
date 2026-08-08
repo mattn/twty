@@ -110,6 +110,42 @@ func TestMcpGetListTweetsMissingList(t *testing.T) {
 	}
 }
 
+func TestListMCPToolsReadOnlyByDefault(t *testing.T) {
+	app := &App{}
+	for _, tool := range app.listMCPTools() {
+		if mcpWriteTools[tool.Name] {
+			t.Errorf("write tool %s listed without -allow-post", tool.Name)
+		}
+	}
+
+	app.allowPost = true
+	if got, want := len(app.listMCPTools()), len(mcpTools); got != want {
+		t.Errorf("with -allow-post got %d tools, want %d", got, want)
+	}
+}
+
+func TestHandleToolCallWriteToolDisabled(t *testing.T) {
+	app := &App{}
+	for name := range mcpWriteTools {
+		_, rpcErr := app.handleToolCall(json.RawMessage(`{"name":"` + name + `","arguments":{"text":"hi","tweet_id":"1"}}`))
+		if rpcErr == nil || rpcErr.Code != -32602 {
+			t.Errorf("tool %s: expected -32602 error without -allow-post, got %+v", name, rpcErr)
+		}
+	}
+}
+
+func TestMcpToolAnnotations(t *testing.T) {
+	for _, tool := range mcpTools {
+		if tool.Annotations == nil {
+			t.Errorf("tool %s: missing annotations", tool.Name)
+			continue
+		}
+		if want := !mcpWriteTools[tool.Name]; tool.Annotations.ReadOnlyHint != want {
+			t.Errorf("tool %s: readOnlyHint = %v, want %v", tool.Name, tool.Annotations.ReadOnlyHint, want)
+		}
+	}
+}
+
 func TestMcpToolsSchemaParses(t *testing.T) {
 	for _, tool := range mcpTools {
 		var schema map[string]any
