@@ -96,6 +96,10 @@ twty can run as an [MCP (Model Context Protocol)](https://modelcontextprotocol.i
 
     $ twty -mcp
 
+By default the MCP server is **read-only**: posting tools (`post_tweet`, `like_tweet`, `retweet`) are not exposed, so an AI assistant can never post on your behalf by accident. To opt in to posting, start the server with `-allow-post`:
+
+    $ twty -mcp -allow-post
+
 To use with Claude Code, add the following to your MCP settings:
 
 ```json
@@ -119,9 +123,9 @@ Available tools:
 | `get_user_tweets` | Get tweets from a specific user |
 | `get_list_tweets` | Get tweets from a list |
 | `read_tweet` | Read a tweet from an X URL or tweet ID |
-| `post_tweet` | Post a new tweet (with optional reply) |
-| `like_tweet` | Like a tweet |
-| `retweet` | Retweet a tweet |
+| `post_tweet` | Post a new tweet (with optional reply) — requires `-allow-post` |
+| `like_tweet` | Like a tweet — requires `-allow-post` |
+| `retweet` | Retweet a tweet — requires `-allow-post` |
 
 **Note:** You must run `twty` at least once without `-mcp` first to complete OAuth authorization.
 
@@ -136,7 +140,8 @@ Available tools:
     -s WORD: search timeline
     -read URL: read tweet(s) from an X URL or tweet ID (status or profile URL)
     -S DELAY: tweets after DELAY
-    -mcp: run as MCP server
+    -mcp: run as MCP server over stdio. Read-only unless -allow-post is given.
+    -allow-post: enable posting tools (post_tweet/like_tweet/retweet) in MCP mode.
     -json: as JSON
     -r: show replies
     -v: detail display

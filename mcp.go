@@ -28,9 +28,41 @@ type jsonrpcError struct {
 }
 
 type mcpTool struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"inputSchema"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	InputSchema json.RawMessage     `json:"inputSchema"`
+	Annotations *mcpToolAnnotations `json:"annotations,omitempty"`
+}
+
+type mcpToolAnnotations struct {
+	ReadOnlyHint    bool `json:"readOnlyHint"`
+	DestructiveHint bool `json:"destructiveHint"`
+	OpenWorldHint   bool `json:"openWorldHint"`
+}
+
+var (
+	readAnnotations  = &mcpToolAnnotations{ReadOnlyHint: true, DestructiveHint: false, OpenWorldHint: true}
+	writeAnnotations = &mcpToolAnnotations{ReadOnlyHint: false, DestructiveHint: true, OpenWorldHint: true}
+)
+
+// Tools that publish to X. Hidden and rejected unless -allow-post is given.
+var mcpWriteTools = map[string]bool{
+	"post_tweet": true,
+	"like_tweet": true,
+	"retweet":    true,
+}
+
+func (app *App) listMCPTools() []mcpTool {
+	if app.allowPost {
+		return mcpTools
+	}
+	tools := make([]mcpTool, 0, len(mcpTools))
+	for _, t := range mcpTools {
+		if !mcpWriteTools[t.Name] {
+			tools = append(tools, t)
+		}
+	}
+	return tools
 }
 
 type mcpContent struct {
@@ -48,46 +80,55 @@ var mcpTools = []mcpTool{
 		Name:        "get_timeline",
 		Description: "Get your X (Twitter) home timeline",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}}}`),
+		Annotations: readAnnotations,
 	},
 	{
 		Name:        "search_tweets",
 		Description: "Search recent tweets on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["query"]}`),
+		Annotations: readAnnotations,
 	},
 	{
 		Name:        "get_mentions",
 		Description: "Get your mentions and replies on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}}}`),
+		Annotations: readAnnotations,
 	},
 	{
 		Name:        "get_user_tweets",
 		Description: "Get tweets from a specific user on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"username":{"type":"string","description":"Twitter username (without @)"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["username"]}`),
+		Annotations: readAnnotations,
 	},
 	{
 		Name:        "get_list_tweets",
 		Description: "Get tweets from a list on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"list":{"type":"string","description":"List ID or owner/list-name"},"count":{"type":"integer","minimum":1,"maximum":100,"description":"Number of tweets to fetch (max 100)"}},"required":["list"]}`),
+		Annotations: readAnnotations,
 	},
 	{
 		Name:        "read_tweet",
 		Description: "Read a tweet from an X (Twitter) URL or tweet ID. Use this instead of fetching x.com / twitter.com / t.co URLs directly. A profile URL returns the user's recent tweets.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"X URL (https://x.com/user/status/ID, https://x.com/user or https://t.co/XXX) or tweet ID"}},"required":["url"]}`),
+		Annotations: readAnnotations,
 	},
 	{
 		Name:        "post_tweet",
 		Description: "Post a new tweet on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"text":{"type":"string","description":"Tweet text"},"reply_to":{"type":"string","description":"Tweet ID to reply to"}},"required":["text"]}`),
+		Annotations: writeAnnotations,
 	},
 	{
 		Name:        "like_tweet",
 		Description: "Like (favorite) a tweet on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"tweet_id":{"type":"string","description":"Tweet ID to like"}},"required":["tweet_id"]}`),
+		Annotations: writeAnnotations,
 	},
 	{
 		Name:        "retweet",
 		Description: "Retweet a tweet on X (Twitter)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"tweet_id":{"type":"string","description":"Tweet ID to retweet"}},"required":["tweet_id"]}`),
+		Annotations: writeAnnotations,
 	},
 }
 
@@ -132,7 +173,7 @@ func (app *App) serveMCP() {
 			})
 		case "tools/list":
 			resp.Result = mustMarshal(map[string]any{
-				"tools": mcpTools,
+				"tools": app.listMCPTools(),
 			})
 		case "tools/call":
 			result, rpcErr := app.handleToolCall(req.Params)
@@ -172,6 +213,10 @@ func (app *App) handleToolCall(params json.RawMessage) (*mcpToolResult, *jsonrpc
 	}
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &jsonrpcError{Code: -32602, Message: "invalid params: " + err.Error()}
+	}
+
+	if mcpWriteTools[req.Name] && !app.allowPost {
+		return nil, &jsonrpcError{Code: -32602, Message: "tool disabled: " + req.Name + " requires the MCP server to be started with -allow-post"}
 	}
 
 	switch req.Name {

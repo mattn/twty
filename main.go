@@ -1036,6 +1036,7 @@ type App struct {
 	showVersion bool
 	debug       bool
 	mcp         bool
+	allowPost   bool
 }
 
 func readFile(filename string) ([]byte, error) {
@@ -1088,6 +1089,7 @@ func parseFlags(app *App) {
 	flag.BoolVar(&app.debug, "debug", false, "debug json")
 	flag.BoolVar(&app.showVersion, "V", false, "Print the version")
 	flag.BoolVar(&app.mcp, "mcp", false, "run as MCP server")
+	flag.BoolVar(&app.allowPost, "allow-post", false, "enable posting tools in MCP mode")
 
 	flag.StringVar(&app.fromfile, "ff", "", "post utf-8 string from a file(\"-\" means STDIN)")
 	flag.StringVar(&app.count, "count", "", "fetch tweets count")
@@ -1121,7 +1123,8 @@ const usage = `Usage of twty:
   -until DATE: show tweets created before the DATE (ex. 2017-05-31)
   -since_id NUMBER: show tweets that have ids greater than NUMBER.
   -max_id NUMBER: show tweets that have ids lower than NUMBER.
-  -mcp: run as MCP server over stdio.
+  -mcp: run as MCP server over stdio. Read-only unless -allow-post is given.
+  -allow-post: enable posting tools (post_tweet/like_tweet/retweet) in MCP mode.
   -debug: dump raw API responses.
   -V: print the version.
 `
