@@ -758,11 +758,28 @@ func tweetText(tweet V2Tweet, tweetMap map[string]V2Tweet) string {
 	return tweet.Text
 }
 
+const (
+	v2TweetFieldList = "created_at,author_id,text,referenced_tweets"
+	v2UserFieldList  = "name,username,profile_image_url"
+)
+
+// v2TweetFields returns the query parameters for tweet requests, expanding
+// only the author. Referenced tweets are not expanded because expansion
+// objects are billed on pay-per-use, and replied_to parents would be billed
+// without ever being displayed. See resolveReferencedTweets.
 func v2TweetFields() map[string]string {
 	return map[string]string{
-		"tweet.fields": "created_at,author_id,text,referenced_tweets",
-		"user.fields":  "name,username,profile_image_url",
-		"expansions":   "author_id,referenced_tweets.id",
+		"tweet.fields": v2TweetFieldList,
+		"user.fields":  v2UserFieldList,
+		"expansions":   "author_id",
+	}
+}
+
+// v2TweetFieldsNoExpansions returns the query parameters for tweet requests
+// whose author is already known to the caller.
+func v2TweetFieldsNoExpansions() map[string]string {
+	return map[string]string{
+		"tweet.fields": v2TweetFieldList,
 	}
 }
 

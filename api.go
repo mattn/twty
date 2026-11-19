@@ -26,20 +26,69 @@ func (app *App) fetchHomeTweets(count, sinceID, maxID string) (V2TweetsResponse,
 
 	var res V2TweetsResponse
 	err = app.callGet("https://api.twitter.com/2/users/"+myID+"/timelines/reverse_chronological", params, &res)
-	return res, err
+	if err != nil {
+		return res, err
+	}
+	return res, app.resolveReferencedTweets(&res)
+}
+
+// referencedTweetIDsToFetch returns the IDs of retweeted and quoted tweets
+// that tweetText needs but that are not yet in res.Includes.Tweets.
+// replied_to references are skipped because they are never displayed.
+func referencedTweetIDsToFetch(res V2TweetsResponse) []string {
+	have := make(map[string]bool)
+	for _, t := range res.Includes.Tweets {
+		have[t.ID] = true
+	}
+	var ids []string
+	for _, tweet := range res.Data {
+		for _, ref := range tweet.ReferencedTweets {
+			if ref.Type != "retweeted" && ref.Type != "quoted" {
+				continue
+			}
+			if have[ref.ID] {
+				continue
+			}
+			have[ref.ID] = true
+			ids = append(ids, ref.ID)
+		}
+	}
+	return ids
+}
+
+// resolveReferencedTweets looks up the retweeted and quoted tweets of res
+// and adds them to res.Includes.Tweets.
+func (app *App) resolveReferencedTweets(res *V2TweetsResponse) error {
+	ids := referencedTweetIDsToFetch(*res)
+	const maxIDs = 100
+	for len(ids) > 0 {
+		n := min(len(ids), maxIDs)
+		params := v2TweetFieldsNoExpansions()
+		params["ids"] = strings.Join(ids[:n], ",")
+		var lookup struct {
+			Data []V2Tweet `json:"data"`
+		}
+		if err := app.callGet("https://api.twitter.com/2/tweets", params, &lookup); err != nil {
+			return fmt.Errorf("cannot fetch referenced tweets: %v", err)
+		}
+		res.Includes.Tweets = append(res.Includes.Tweets, lookup.Data...)
+		ids = ids[n:]
+	}
+	return nil
 }
 
 func (app *App) fetchTweet(id string) (V2TweetsResponse, error) {
-	var res V2SingleTweetResponse
-	err := app.callGet("https://api.twitter.com/2/tweets/"+id, v2TweetFields(), &res)
+	var single V2SingleTweetResponse
+	err := app.callGet("https://api.twitter.com/2/tweets/"+id, v2TweetFields(), &single)
 	if err != nil {
 		return V2TweetsResponse{}, err
 	}
-	return V2TweetsResponse{
-		Data:     []V2Tweet{res.Data},
-		Includes: res.Includes,
+	res := V2TweetsResponse{
+		Data:     []V2Tweet{single.Data},
+		Includes: single.Includes,
 		Meta:     V2Meta{ResultCount: 1},
-	}, nil
+	}
+	return res, app.resolveReferencedTweets(&res)
 }
 
 func (app *App) fetchSearchTweets(query, count, since, until, sinceID string) (V2TweetsResponse, error) {
@@ -60,7 +109,10 @@ func (app *App) fetchSearchTweets(query, count, since, until, sinceID string) (V
 
 	var res V2TweetsResponse
 	err := app.callGet("https://api.twitter.com/2/tweets/search/recent", params, &res)
-	return res, err
+	if err != nil {
+		return res, err
+	}
+	return res, app.resolveReferencedTweets(&res)
 }
 
 func (app *App) fetchMentions(count string) (V2TweetsResponse, error) {
@@ -76,17 +128,24 @@ func (app *App) fetchMentions(count string) (V2TweetsResponse, error) {
 
 	var res V2TweetsResponse
 	err = app.callGet("https://api.twitter.com/2/users/"+myID+"/mentions", params, &res)
-	return res, err
+	if err != nil {
+		return res, err
+	}
+	return res, app.resolveReferencedTweets(&res)
 }
 
 func (app *App) fetchUserTweets(username, count, sinceID, maxID string) (V2TweetsResponse, error) {
 	var userRes V2UserResponse
-	err := app.callGet("https://api.twitter.com/2/users/by/username/"+username, nil, &userRes)
+	err := app.callGet("https://api.twitter.com/2/users/by/username/"+username, map[string]string{
+		"user.fields": v2UserFieldList,
+	}, &userRes)
 	if err != nil {
 		return V2TweetsResponse{}, err
 	}
 
-	params := v2TweetFields()
+	// The author of every tweet in a user timeline is the user looked up
+	// above, so expanding author_id would only bill for the same user again.
+	params := v2TweetFieldsNoExpansions()
 	if count != "" {
 		params["max_results"] = count
 	}
@@ -99,7 +158,11 @@ func (app *App) fetchUserTweets(username, count, sinceID, maxID string) (V2Tweet
 
 	var res V2TweetsResponse
 	err = app.callGet("https://api.twitter.com/2/users/"+userRes.Data.ID+"/tweets", params, &res)
-	return res, err
+	if err != nil {
+		return res, err
+	}
+	res.Includes.Users = []V2User{userRes.Data}
+	return res, app.resolveReferencedTweets(&res)
 }
 
 func (app *App) resolveListID(list string) (string, error) {
@@ -156,7 +219,10 @@ func (app *App) fetchListTweets(list, count string) (V2TweetsResponse, error) {
 
 	var res V2TweetsResponse
 	err = app.callGet("https://api.twitter.com/2/lists/"+listID+"/tweets", params, &res)
-	return res, err
+	if err != nil {
+		return res, err
+	}
+	return res, app.resolveReferencedTweets(&res)
 }
 
 func (app *App) createTweet(text, inReplyTo string, mediaIDs []string) (string, error) {
